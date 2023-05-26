@@ -15,3 +15,8 @@
 
 [From Multi-Agent Pathfinding to 3D Pipe Routing](https://aaai.org/papers/00011-from-multi-agent-pathfinding-to-3d-pipe-routing/)
 
+[Conflict-based search for optimal multi-agent pathfinding](https://www.sciencedirect.com/science/article/pii/S0004370214001386#se0260)
+
+4. MIP
+
+[Optimal Pipe Routing Techniques in an Obstacle-Free 3D Space](https://hal.science/hal-02865302v1)
