@@ -20,3 +20,5 @@
 4. MIP
 
 [Optimal Pipe Routing Techniques in an Obstacle-Free 3D Space](https://hal.science/hal-02865302v1)
+
+Optimization of Cable Harness Routing Mathematical Modelling, Lagrangian Relaxation, and Subgra-dient Optimization 
