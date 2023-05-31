@@ -1,5 +1,5 @@
 from queue import PriorityQueue
-from itertools import product, combinations
+from itertools import product
 
 # Determine whether in a valid space or not
 def is_valid(node):
@@ -91,11 +91,11 @@ def explore_sp(M, N, L, obstacle_coords=None):
 
 
 # the grid size of cuboid
-M, N, L = 100, 100, 100  # 网格规模
+M, N, L = 10, 10, 10
 
 # define start and end cell
-start = (99, 0, 99)
-end = (0, 46, 0)
+start = (0, 0, 0)
+end = (4, 6, 0)
 
 # define the direction of pipe
 directions = [(0, 1, 0), (0, -1, 0), (1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1)]
@@ -110,8 +110,7 @@ L_min = 1
 Sp = explore_sp(M, N, L)
 
 # define energy
-energy = set_energy(Sp)
-
+# energy = set_energy(Sp)
 
 # define the heuristic function
 def heuristic(node):
@@ -126,7 +125,7 @@ def A_star():
     open_map = {(layer, column, row): 0 for layer in range(M) for column in range(N) for row in range(L)}
     close_map = {(layer, column, row): 0 for layer in range(M) for column in range(N) for row in range(L)}
     dir_map = {(layer, column, row): -1 for layer in range(M) for column in range(N) for row in range(L)}
-
+    print("Init done!")
     pq.put((0, start))
     open_map[start] = g(start, dir_map, start, n_bend=0)
     bends = [start]
@@ -135,8 +134,9 @@ def A_star():
         _, v = pq.get()
 
         if v == end:
-            return construct_path(dir_map, end, start)
+            return construct_path(dir_map, end, start), n_bend
 
+        # print(f"exploring {v}")
         close_map[v] = 1
         open_map[v] = 0
         n_bend = 0
@@ -153,36 +153,34 @@ def A_star():
                     if d >= L_min:
                         bends.append(v)
                         n_bend += 1
+                        dir_map[v] = v0
                         dist = g(v, dir_map, start, n_bend)
                         if open_map[v] == 0:
                             g_v = dist
                             h_v = heuristic(v)
                             f_v = g_v + w * h_v
                             open_map[v] = g_v
-                            dir_map[v] = v0
                             pq.put((f_v, v))
                         elif open_map[v] > dist:
                             g_v = dist
                             h_v = heuristic(v)
                             f_v = g_v + w * h_v
                             open_map[v] = g_v
-                            dir_map[v] = v0
                             update_priority_queue(pq, v, f_v)
                 else:
+                    dir_map[v] = v0
                     dist = g(v, dir_map, start, n_bend)
                     if open_map[v] == 0:
                         g_v = dist
                         h_v = heuristic(v)
                         f_v = g_v + w * h_v
                         open_map[v] = g_v
-                        dir_map[v] = v0
                         pq.put((f_v, v))
                     elif open_map[v] > dist:
                         g_v = dist
                         h_v = heuristic(v)
                         f_v = g_v + w * h_v
                         open_map[v] = g_v
-                        dir_map[v] = v0
                         update_priority_queue(pq, v, f_v)
                 v = v0
 
@@ -190,8 +188,9 @@ def A_star():
 
 
 # run A*
-path = A_star()
+path, n_bend = A_star()
 if path:
+    print("n bend: ", n_bend)
     print("optimal path：")
     for node in path:
         print(node)

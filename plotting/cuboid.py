@@ -23,8 +23,7 @@ def structure_cuboid(coord1, coord2, ax=None):
         # ax.scatter3D(*center, color="r")
         if np.linalg.norm(s - e) == 2 * r1[1] or np.linalg.norm(s - e) == 2 * r2[1] or np.linalg.norm(s - e) == 2 * r3[
             1]:
-            print(zip(s, e))
-            ax.plot3D(*zip(s, e), color="purple", lw=1., alpha=0.5)
+            ax.plot3D(*zip(s, e), color="purple", lw=1., alpha=0.7)
     return ax
 
 
@@ -58,23 +57,24 @@ def shadow_cuboid(coord1, coord2, ax=None, stride=1):
 
 
 if __name__ == '__main__':
-    center = (0, 0, 0)
-    coord_outer = [(50, 50, 50), (-50, -50, -50)]
+    coord_outer = [(0, 0, 0), (200, 80, 50)]
     # diagonal obstacle
-    coords = [[(-45, -50, 20), (-30, 20, 0)],
-              [(0, -50, 30), (50, 10, 10)],
-              [(0, -50, -10), (50, 50, -30)],
-              [(-10, -50, 50), (-20, -10, 20)],
-              [(-30, -50, -50), (10, 30, -40)]]
+    coords = [[(30, 30, 30), (50, 40, 40)],
+              [(100, 30, 30), (150, 50, 50)],
+              [(50, 60, 0), (150, 80, 20)],
+              [(150, 0, 0), (190, 30, 40)]]
     fig = plt.figure(figsize=(10, 10))
     ax = fig.add_subplot(111, projection='3d')
     ax.set_aspect("auto")
-    shadow_cuboid(coord_outer[0], coord_outer[1], ax=ax)
+    structure_cuboid(coord_outer[0], coord_outer[1], ax=ax)
     for i in range(len(coords)):
-        ax = structure_cuboid(coords[i][0], coords[i][1], ax=ax)
-    # ax.view_init(60, 35)
+        ax = shadow_cuboid(coords[i][0], coords[i][1], ax=ax)
+    ax.view_init(30, 60)
     # ax.axis("off")
-    # ax.set_xticks([])
-    # ax.set_yticks([])
-    # ax.set_zticks([])
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
     fig.show()

@@ -1,0 +1,26 @@
+class Node:
+    @staticmethod
+    def change_point(p1: tuple, p2: tuple):
+        # Manhattan distance between two arbitrary points
+        distance = tuple(abs(x - y) for x, y in zip(p1, p2))
+        count = distance.count(1)
+        return count == len(tuple) - 1
+
+    def __init__(self, coord, parent=None):
+        self.coord = coord
+        self.parent = parent
+
+        if self.parent is None:
+            self.depth = 1
+            self.n_cp = 0
+        else:
+            self.depth = self.parent.depth + 1
+            if self.parent.parent is not None:
+                if self.change_point(self.parent.parent.coord, self.coord):
+                    self.n_cp = self.parent.n_cp + 1
+
+    def __repr__(self):
+        return "|".join(self.coord)
+
+    def __eq__(self, other):
+        self.coord = other.coord
