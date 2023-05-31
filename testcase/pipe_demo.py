@@ -1,32 +1,93 @@
-import numpy as np
 from queue import PriorityQueue
+from itertools import product, combinations
 
-class Node:
-    def __init__(self, data):
-        self.data = data
-        self.next = None
+# Determine whether in a valid space or not
+def is_valid(node):
+    x, y, z = node
+    return 0 <= x < M and 0 <= y < N and 0 <= z < L
 
 
-class LinkedList:
-    def __init__(self):
-        self.head = None
+# Determine whether or not is a bend
+def forms_bend(v_pre, v_post):
+    if v_pre==-1:
+        return False
+    else:
+        distance = tuple(abs(x - y) for x, y in zip(v_pre, v_post))
+        if distance.count(1) == 2:
+            return True
+    return False
 
-    def append(self, data):
-        new_node = Node(data)
-        if self.head is None:
-            self.head = new_node
+
+# calculate
+def calculate_distance(last_bend, v):
+    return manhattan_distance(last_bend, v) + 1
+
+
+# Compute the loss
+def g(v, dir_map, start, n_bend, a=1, b=1, c=10):
+    f = a * len(construct_path(dir_map, v, start)) + b * n_bend + c * 0  # energy
+    return f
+
+
+# update the priority queue if need to replace element
+def update_priority_queue(pq, v, f_v):
+    pq.queue = [(priority, value) for priority, value in pq.queue if value != v]
+    pq.put((f_v, v))
+
+
+def manhattan_distance(grid_s, grid_e):
+    distance = tuple(abs(x - y) for x, y in zip(grid_s, grid_e))
+    return sum(distance)
+
+
+# 构造最优路径
+def construct_path(dir_map, curr_node, start):
+    path = []
+    while curr_node != start:
+        path.append(curr_node)
+        curr_node = dir_map[curr_node]
+    path.append(start)
+    path.reverse()
+    return path
+
+
+def set_energy(Sp, distance=3):
+    energy = Sp
+    directions = [(x, y, z) for x in range(-distance, distance+1) for y in range(-distance, distance+1) for z in range(-distance, distance+1)]
+    for coord, obs in Sp.items():
+        if obs == 1:
+            for direction in directions:
+                coord_new = tuple(coord[i] + direction[i] for i in range(3))
+                energy[coord_new] = 1
+    for coord, obs in Sp.items():
+        if obs == 1:
+            energy[coord] = float('inf')
+        elif energy[coord] == 1:
+            energy[coord] = 5
         else:
-            current = self.head
-            while current.next:
-                current = current.next
-            current.next = new_node
+            energy[coord] = 25
+    return energy
 
-    def display(self):
-        current = self.head
-        while current:
-            print(current.data, end=" -> ")
-            current = current.next
-        print("None")
+
+def explore_sp(M, N, L, obstacle_coords=None):
+    Sp = {(layer, column, row): 0 for layer in range(M) for column in range(N) for row in range(L)}
+    for x, y in list(product(range(M), range(N))):
+        Sp[(x, y, -1)] = 1
+        Sp[(x, y, L)] = 1
+    for y, z in list(product(range(N), range(L))):
+        Sp[(-1, y, z)] = 1
+        Sp[(M, y, z)] = 1
+    for x, z in list(product(range(M), range(L))):
+        Sp[(x, -1, z)] = 1
+        Sp[(x, N, z)] = 1
+    if obstacle_coords is not None:
+        for i in range(len(obstacle_coords)):
+            coord0, coord1 = obstacle_coords[i][0], obstacle_coords[i][1]
+            for x, y, z in Sp.keys():
+                if coord0[0] - 1 <= x <= coord1[0] + 1 and coord0[1] - 1 <= y <= coord1[1] + 1 and coord0[2] - 1 <= z <= \
+                        coord1[2] + 1:
+                    Sp[(x, y, z)] = 1
+    return Sp
 
 
 # the grid size of cuboid
@@ -45,10 +106,12 @@ w = 1.0
 # The minimum length of two neighbor bends
 L_min = 1
 
-dir_map = LinkedList()
-
 # define obstacle-grid and free-grid Sp
-Sp = None
+Sp = explore_sp(M, N, L)
+
+# define energy
+energy = set_energy(Sp)
+
 
 # define the heuristic function
 def heuristic(node):
@@ -56,26 +119,27 @@ def heuristic(node):
     out = sum(distance)
     return out
 
+
 # main function of A start algorithm
 def A_star():
     pq = PriorityQueue()
     open_map = {(layer, column, row): 0 for layer in range(M) for column in range(N) for row in range(L)}
     close_map = {(layer, column, row): 0 for layer in range(M) for column in range(N) for row in range(L)}
+    dir_map = {(layer, column, row): -1 for layer in range(M) for column in range(N) for row in range(L)}
 
     pq.put((0, start))
-    open_map[start] = 1
-    g_s = 0
+    open_map[start] = g(start, dir_map, start, n_bend=0)
     bends = [start]
-
 
     while not pq.empty():
         _, v = pq.get()
-        dir_map.append(v)
 
         if v == end:
-            return construct_path(dir_map, start, end)
+            return construct_path(dir_map, end, start)
 
         close_map[v] = 1
+        open_map[v] = 0
+        n_bend = 0
 
         for direction in directions:
             neighbor = tuple(v[i] + direction[i] for i in range(3))
@@ -84,88 +148,52 @@ def A_star():
                 v0 = v
                 v = neighbor
 
-                if forms_bend(v0, v):
-                    d = calculate_distance(v, bends[-1])
-
+                if forms_bend(dir_map[v0], v):
+                    d = calculate_distance(v0, bends[-1])
                     if d >= L_min:
-                        dist = g(v)
+                        bends.append(v)
+                        n_bend += 1
+                        dist = g(v, dir_map, start, n_bend)
                         if open_map[v] == 0:
                             g_v = dist
                             h_v = heuristic(v)
                             f_v = g_v + w * h_v
                             open_map[v] = g_v
-                            dir_map.append(v)
+                            dir_map[v] = v0
                             pq.put((f_v, v))
                         elif open_map[v] > dist:
                             g_v = dist
                             h_v = heuristic(v)
                             f_v = g_v + w * h_v
                             open_map[v] = g_v
-                            dir_map.append(v)
+                            dir_map[v] = v0
                             update_priority_queue(pq, v, f_v)
                 else:
-                    dist = g(v)
+                    dist = g(v, dir_map, start, n_bend)
                     if open_map[v] == 0:
                         g_v = dist
                         h_v = heuristic(v)
                         f_v = g_v + w * h_v
                         open_map[v] = g_v
-                        dir_map.append(v)
+                        dir_map[v] = v0
                         pq.put((f_v, v))
                     elif open_map[v] > dist:
                         g_v = dist
                         h_v = heuristic(v)
                         f_v = g_v + w * h_v
                         open_map[v] = g_v
-                        dir_map.append(v)
+                        dir_map[v] = v0
                         update_priority_queue(pq, v, f_v)
                 v = v0
 
     return None
 
-# 判断节点是否在立方体内部
-def is_valid(node):
-    x, y, z = node
-    return 0 <= x < M and 0 <= y < N and 0 <= z < L
 
-# 判断是否形成弯曲
-def forms_bend(v0, v):
-    # 实现弯曲判断逻辑
-    pass
-
-# 计算两个节点之间的距离
-def calculate_distance(v0, v):
-    # 实现距离计算逻辑
-    pass
-
-
-# 计算节点的实际代价
-def g(v):
-    # 实现实际代价计算逻辑
-    pass
-
-# 更新优先队列中的节点优先级
-def update_priority_queue(pq, v, f_v):
-    # 实现优先队列更新逻辑
-    pq.queue = [(priority, value) for priority, value in pq.queue if value != v]
-    pq.put((f_v, v))
-
-# 构造最优路径
-def construct_path(dir_map, start, end):
-    path = []
-    current_node = end
-    while current_node != start:
-        path.append(current_node)
-        current_node = Sp[dir_map[current_node]].id
-    path.append(start)
-    path.reverse()
-    return path
-
-# 运行A*算法并输出结果
+# run A*
 path = A_star()
 if path:
-    print("最优路径：")
+    print("optimal path：")
     for node in path:
         print(node)
 else:
-    print("无法找到路径")
+    print("cant find valid path")
