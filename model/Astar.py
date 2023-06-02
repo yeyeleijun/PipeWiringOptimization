@@ -66,8 +66,6 @@ class AStar:
         return None
 
     def set_energy(self, distance=2):
-
-
         pass
 
     def base_cost(self, p, w_path=1, w_bend=1, w_energy=1):
