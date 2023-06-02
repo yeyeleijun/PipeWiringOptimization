@@ -1,7 +1,7 @@
 import numpy as np
 from queue import PriorityQueue
 import sys
-from Point import Node
+from model.Point import Node
 import time
 from itertools import product
 
@@ -40,18 +40,16 @@ class AStar:
         :param start: the starting nozzle, example as (1, 1) grid.
         """
         self.space_coords = space_coords
-        grid_size = tuple(space_coords[1][i] - space_coords[0][i] for i in range(len(space_coords[0])))
+        self.grid_size = tuple(space_coords[1][i] - space_coords[0][i] for i in range(len(space_coords[0])))
         self.dim = len(space_coords[0])
         assert self.dim == len(start)
         self.start = Node(start)
-        self.open_set = np.zeros(grid_size, dtype=np.float32)
-        self.close_set = np.zeros(grid_size, dtype=np.float32)
-        self.dir_map = np.zeros(grid_size, dtype=np.float32)
+        self.open_set = np.zeros(self.grid_size, dtype=np.float32)
+        self.close_set = np.zeros(self.grid_size, dtype=np.float32)
+        self.dir_map = np.zeros(self.grid_size, dtype=np.float32)
         self.pq = PriorityQueue()
         self.pq.put((0, self.start))
-
-        self.n_bend = 0
-        self.free_grid = np.ones(grid_size, dtype=np.uint8)  # 1 is valid
+        self.free_grid = np.ones(self.grid_size, dtype=np.uint8)  # 1 is valid
 
     def explore_obstacle(self, obstacle_coords, tolerance=0):
         """
@@ -67,6 +65,11 @@ class AStar:
                     self.free_grid[coord] = 0
         return None
 
+    def set_energy(self, distance=2):
+
+
+        pass
+
     def base_cost(self, p, w_path=1, w_bend=1, w_energy=1):
         # TODO: add a energy function.
         f = w_path * p.depth + w_bend * p.n_cp + w_energy * 0
@@ -76,14 +79,11 @@ class AStar:
         # Manhattan distance between current point and end point
         return self.manhattan_distance(p_coord, end)
 
-    def update_bend_num(self, p):
-        pass
-
     def total_cost(self, p, end):
         return self.base_cost(p) + self.heuristic_cost(p.coord, end)
 
     def is_valid_point(self, p_coord: tuple):
-        if self.free_grid[p_coord]:
+        if self.coord_valid(p_coord, self.space_coords[0], self.space_coords[1]) and self.free_grid[p_coord]:
             return True
         else:
             return False
@@ -104,7 +104,6 @@ class AStar:
             return None  # Do nothing for invalid point
         if self.is_in_close_set(curr_p_coord):
             return None  # Do nothing for visited point
-        print(f'Process Point: {curr_p_coord}')
 
         p_cost = self.total_cost(curr_p, end)
         if not self.is_in_open_set(curr_p_coord):
@@ -130,25 +129,25 @@ class AStar:
     def run(self, end):
         start_time = time.time()
 
+        # Process all neighbors
+        directions = []
+        for k in range(self.dim):
+            direction = [0] * self.dim
+            direction[k] = 1
+            directions.append(tuple(direction))
+            direction = [0] * self.dim
+            direction[k] = -1
+            directions.append(tuple(direction))
+
         while not self.pq.empty():
             # find the node with minimum cost
             curr_p = self.pq.get()[1]
-
+            print(f'Process Point: {curr_p.coord}')
             if self.cmp(curr_p.coord, end):  # exit if finding the end point
                 return self.build_path(curr_p)
 
             self.close_set[curr_p.coord] = 1
             self.open_set[curr_p.coord] = 0
-
-            # Process all neighbors
-            directions = []
-            for k in range(self.dim):
-                direction = [0] * self.dim
-                direction[k] = 1
-                directions.append(tuple(direction))
-                direction = [0] * self.dim
-                direction[k] = -1
-                directions.append(tuple(direction))
 
             pre_p = curr_p
             for direction in directions:

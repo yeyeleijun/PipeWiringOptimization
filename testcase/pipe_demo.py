@@ -25,7 +25,7 @@ def calculate_distance(last_bend, v):
 
 # Compute the loss
 def g(v, dir_map, start, n_bend, a=1, b=1, c=10):
-    f = a * len(construct_path(dir_map, v, start)) + b * n_bend + c * 0  # energy
+    f = a * len(construct_path(dir_map, v, start)) + b * n_bend + c * energy[v]   # energy
     return f
 
 
@@ -51,23 +51,18 @@ def construct_path(dir_map, curr_node, start):
     return path
 
 
-def set_energy(Sp, distance=3):
-    energy = Sp
+def set_energy(Sp, distance=1):
+    energy = {(layer, column, row): 25 for layer in range(M) for column in range(N) for row in range(L)}
     directions = [(x, y, z) for x in range(-distance, distance+1) for y in range(-distance, distance+1) for z in range(-distance, distance+1)]
-    for coord, obs in Sp.items():
-        if obs == 1:
-            for direction in directions:
-                coord_new = tuple(coord[i] + direction[i] for i in range(3))
-                energy[coord_new] = 1
-    for coord, obs in Sp.items():
-        if obs == 1:
-            energy[coord] = float('inf')
-        elif energy[coord] == 1:
-            energy[coord] = 5
-        else:
-            energy[coord] = 25
+    obstacle_coord = {k: v for k, v in Sp.items() if v == 1}
+    for coord in obstacle_coord.keys():
+        for direction in directions:
+            coord_new = tuple(coord[i] + direction[i] for i in range(3))
+            if is_valid(coord_new) and Sp[coord_new] == 1:
+                energy[coord_new] = float('inf')
+            else:
+                energy[coord_new] = 5
     return energy
-
 
 def explore_sp(M, N, L, obstacle_coords=None):
     Sp = {(layer, column, row): 0 for layer in range(M) for column in range(N) for row in range(L)}
@@ -96,6 +91,11 @@ M, N, L = 10, 10, 10
 # define start and end cell
 start = (0, 0, 0)
 end = (4, 6, 0)
+M, N, L = 10, 10, 10  # 网格规模
+
+# define start and end cell
+start = (0, 0, 0)
+end = (4, 6, 2)
 
 # define the direction of pipe
 directions = [(0, 1, 0), (0, -1, 0), (1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1)]
@@ -107,7 +107,7 @@ w = 1.0
 L_min = 1
 
 # define obstacle-grid and free-grid Sp
-Sp = explore_sp(M, N, L)
+Sp = explore_sp(M, N, L, obstacle_coords=None)  # [(0, 6, 0), (4, 5, 1)]
 
 # define energy
 # energy = set_energy(Sp)
@@ -182,6 +182,7 @@ def A_star():
                         f_v = g_v + w * h_v
                         open_map[v] = g_v
                         update_priority_queue(pq, v, f_v)
+                print(v, fv)
                 v = v0
 
     return None
@@ -195,4 +196,4 @@ if path:
     for node in path:
         print(node)
 else:
-    print("cant find valid path")
+    print("cant not find valid path")
