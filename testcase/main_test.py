@@ -25,17 +25,18 @@ class test_case(unittest.TestCase):
         model = AStar(space_coords, start)
         obstacle_coord = [[(0, 4, 2), (3, 8, 6)], [(3, 0, 2), (5, 2, 6)]]
         model.explore_obstacle(obstacle_coord)
+        # model.set_energy(obstacle_coord, distance=3)
         path = model.run(end)
-        print(path)
+        # print(path)
 
         fig = plt.figure(figsize=(10, 10))
-        ax = fig.gca(projection='3d')
+        ax = fig.add_subplot(projection='3d')
         ax.set_aspect("auto")
         cuboid.structure_cuboid(space_coords[0], space_coords[1], ax=ax)
         cuboid.shadow_cuboid(obstacle_coord[0][0], obstacle_coord[0][1], ax=ax)
         cuboid.shadow_cuboid(obstacle_coord[1][0], obstacle_coord[1][1], ax=ax)
         trace.plot_trace(path, ax=ax)
-        ax.view_init(20, 60)
+        # ax.view_init(30, 60)
         ax.axis("off")
 
         ax.set_xlabel("x")
@@ -44,10 +45,10 @@ class test_case(unittest.TestCase):
         ax.set_xticks([])
         ax.set_yticks([])
         ax.set_zticks([])
-        for angle in range(0, 360):
-            ax.view_init(30, angle)
-            plt.draw()
-            plt.pause(.001)
+        # for angle in range(0, 360):
+        #     ax.view_init(30, angle)
+        #     plt.draw()
+        #     plt.pause(.001)
         fig.show()
 
 

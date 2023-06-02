@@ -50,7 +50,14 @@ class AStar:
         self.pq = PriorityQueue()
         self.pq.put((0, self.start))
         self.free_grid = np.ones(self.grid_size, dtype=np.uint8)  # 1 is valid
+        self.set_directions()
+        self.energy = np.ones(self.grid_size, dtype=np.uint8) * 10
 
+    def set_directions(self):
+        if self.dim == 3:
+            self.directions = [(0, 1, 0), (0, -1, 0), (1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1)]
+        else:
+            self.directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
     def explore_obstacle(self, obstacle_coords, tolerance=0):
         """
         :param obstacle_coords: list of all obstacles organized as tuples.
@@ -65,12 +72,29 @@ class AStar:
                     self.free_grid[coord] = 0
         return None
 
-    def set_energy(self, distance=2):
-        pass
+    def set_energy(self, obstacle_coords, distance=3):
+        # init the surface this 3d cuboid
+        self.energy[0, :, :] = 1
+        self.energy[-1, :, :] = 1
+        self.energy[:, 0, :] = 1
+        self.energy[:, -1, :] = 1
+        self.energy[:, :, 0] = 1
+        self.energy[:, :, -1] = 1
+
+        # set energy along the obstacle, extending 'distance' steps. [1, 2, 3] -> [5, 3, 1]
+        values = [5, 3, 1][-distance:]
+        for j, dis in enumerate(range(distance, 0, -1)):
+            for i in range(len(obstacle_coords)):
+                coord0, coord1 = obstacle_coords[i]
+                coord0 = tuple(map(lambda item: int(item) - dis, coord0))
+                coord1 = tuple(map(lambda item: int(item) + 1 + dis, coord1))
+                for coord in product(*(range(s, e) for s, e in zip(coord0, coord1))):
+                    if self.coord_valid(coord, self.space_coords[0], self.space_coords[1]):
+                        self.free_grid[coord] = values[j]
+        return None
 
     def base_cost(self, p, w_path=1, w_bend=1, w_energy=1):
-        # TODO: add a energy function.
-        f = w_path * p.depth + w_bend * p.n_cp + w_energy * 0
+        f = w_path * p.depth + w_bend * p.n_cp + self.energy[p.coord] * w_energy
         return f
 
     def heuristic_cost(self, p_coord, end):
@@ -127,20 +151,10 @@ class AStar:
     def run(self, end):
         start_time = time.time()
 
-        # Process all neighbors
-        directions = []
-        for k in range(self.dim):
-            direction = [0] * self.dim
-            direction[k] = 1
-            directions.append(tuple(direction))
-            direction = [0] * self.dim
-            direction[k] = -1
-            directions.append(tuple(direction))
-
         while not self.pq.empty():
             # find the node with minimum cost
             curr_p = self.pq.get()[1]
-            print(f'Process Point: {curr_p.coord}')
+            # print(f'Process Point: {curr_p.coord}')
             if self.cmp(curr_p.coord, end):  # exit if finding the end point
                 return self.build_path(curr_p)
 
@@ -148,7 +162,7 @@ class AStar:
             self.open_set[curr_p.coord] = 0
 
             pre_p = curr_p
-            for direction in directions:
+            for direction in self.directions:
                 curr_p_coord = self.add_tuple(pre_p.coord, direction)
                 curr_p = Node(curr_p_coord, parent=pre_p)
                 self.process_point(curr_p, end)
