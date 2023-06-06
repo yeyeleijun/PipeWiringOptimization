@@ -64,7 +64,7 @@ class AStar:
                 return False
         return True
 
-    def __init__(self, space_coords: tuple, start: tuple):
+    def __init__(self, space_coords: tuple, start: tuple, w_path: float, w_bend: float, w_energy: float):
         """
         :param space_coords: the diagonal coords of the valid cuboid in an incremental order.
                             for example: ((0, 0), (100, 100), one must be (0, 0, 0).
@@ -83,6 +83,9 @@ class AStar:
         self.free_grid = np.ones(self.grid_size, dtype=np.uint8)  # 1 is valid
         self.set_directions()
         self.energy = np.ones(self.grid_size, dtype=np.float32) * 10
+        self.w_path = w_path
+        self.w_bend = w_bend
+        self.w_energy = w_energy
 
     def set_directions(self):
         if self.dim == 3:
@@ -146,8 +149,8 @@ class AStar:
         self.energy[np.where(self.free_grid == 0)] = float('inf')
         return None
 
-    def base_cost(self, p, w_path=1, w_bend=1, w_energy=1):
-        f = w_path * p.depth + w_bend * p.n_cp + self.energy[p.coord] * w_energy
+    def base_cost(self, p):
+        f = self.w_path * p.depth + self.w_bend * p.n_cp + self.energy[p.coord] * self.w_energy
         return f
 
     def heuristic_cost(self, p_coord, end):

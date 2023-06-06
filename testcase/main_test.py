@@ -18,7 +18,7 @@ class test_case(unittest.TestCase):
         space_coords = ((0, 0), (10, 10))  # coords
         start = (0, 2)
         end = (8, 0)  # grip id
-        model = AStar(space_coords, start)
+        model = AStar(space_coords, start, w_path=1, w_bend=1, w_energy=1)
         obstacle_coord = [[(2, 4), (4, 8)], [(3, 0), (5, 2)]]
         model.explore_obstacle(obstacle_coord)
         model.set_energy(obstacle_coord, 2)
