@@ -51,7 +51,7 @@ class AStar:
         self.pq.put((0, self.start))
         self.free_grid = np.ones(self.grid_size, dtype=np.uint8)  # 1 is valid
         self.set_directions()
-        self.energy = np.ones(self.grid_size, dtype=np.float32) * 100
+        self.energy = np.ones(self.grid_size, dtype=np.float32) * 20
 
     def set_directions(self):
         if self.dim == 3:
@@ -76,15 +76,25 @@ class AStar:
     def set_energy(self, obstacle_coords, distance=3):
 
         # set energy along the obstacle, extending 'distance' steps. [1, 2, 3] -> [5, 3, 1]
-        values = [50, 30, 1][-distance:]
+        values = [10, 5, 1][-distance:]
         for j, dis in enumerate(range(distance, 0, -1)):
-            for i in range(len(obstacle_coords)):
-                coord0, coord1 = obstacle_coords[i]
-                coord0 = tuple(map(lambda item: math.floor(item) - dis, coord0))
-                coord1 = tuple(map(lambda item: math.ceil(item) + dis, coord1))
-                for coord in product(*(range(s, e) for s, e in zip(coord0, coord1))):
-                    if self.coord_valid(coord, self.space_coords[0], self.space_coords[1]):
-                        self.energy[coord] = values[j]
+            for ind in range(len(obstacle_coords)):
+                for i in range(self.dim):
+                    coord0, coord1 = obstacle_coords[ind]
+                    coord0 = list(map(lambda item: math.floor(item) - dis, coord0))
+                    coord1 = list(map(lambda item: math.ceil(item) - 1 + dis, coord1))
+                    fixed_coord0 = coord0.pop(i)
+                    fixed_coord1 = coord1.pop(i)
+                    coord0 = [x + 1 for x in coord0]
+                    for coord_new in product(*(range(s, e) for s, e in zip(coord0, coord1))):
+                        coord_new1 = list(coord_new)
+                        coord_new1.insert(i, fixed_coord0)
+                        if self.coord_valid(coord_new1, self.space_coords[0], self.space_coords[1]):
+                            self.energy[tuple(coord_new1)] = values[j]
+                        coord_new2 = list(coord_new)
+                        coord_new2.insert(i, fixed_coord1)
+                        if self.coord_valid(coord_new2, self.space_coords[0], self.space_coords[1]):
+                            self.energy[tuple(coord_new2)] = values[j]
         if self.dim == 2:
             self.energy[0, :] = 1
             self.energy[-1, :] = 1

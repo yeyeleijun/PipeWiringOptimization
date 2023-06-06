@@ -21,7 +21,7 @@ class test_case(unittest.TestCase):
         model = AStar(space_coords, start)
         obstacle_coord = [[(2, 4), (4, 8)], [(3, 0), (5, 2)]]
         model.explore_obstacle(obstacle_coord)
-        model.set_energy(obstacle_coord)
+        model.set_energy(obstacle_coord, 2)
         path, info = model.run(end)
 
         gif = True
