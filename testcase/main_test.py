@@ -16,13 +16,20 @@ import matplotlib.animation as anime
 class test_case(unittest.TestCase):
     def test_dim2_free_space(self):
         space_coords = ((0, 0), (10, 10))  # coords
-        start = (0, 2)
-        end = (8, 0)  # grip id
-        model = AStar(space_coords, start, w_path=1, w_bend=1, w_energy=1)
+        start = [(0, 2), (0, 3)]
+        end = [(8, 0), (8, 1)]  # grip id
+        model = AStar(space_coords, w_path=1, w_bend=1, w_energy=1)
         obstacle_coord = [[(2, 4), (4, 8)], [(3, 0), (5, 2)]]
         model.explore_obstacle(obstacle_coord)
         model.set_energy(obstacle_coord, 2)
-        path, info = model.run(end)
+        paths = []
+        for pipe_i in range(len(start)):
+            path, info = model.run(start[pipe_i], end[pipe_i])
+            for item in path:
+                model.free_grid[item] = 0
+            model.reinit()
+            paths.append(path)
+
 
         gif = True
         if gif:
@@ -58,7 +65,8 @@ class test_case(unittest.TestCase):
         cuboid.structure_cuboid(space_coords[0], space_coords[1], ax=ax)
         for k in range(len(obstacle_coord)):
             cuboid.shadow_cuboid(obstacle_coord[k][0], obstacle_coord[k][1], ax=ax)
-        trace.plot_trace2(path, ax=ax)
+        for path in paths:
+            trace.plot_trace2(path, ax=ax)
         energy = model.energy
         for xx, yy in product(range(energy.shape[0]), range(energy.shape[1])):
             ax.text(xx+0.1, yy+0.3, f"{energy[xx, yy]:.1f}", size=10, color="black")

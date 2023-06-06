@@ -64,7 +64,7 @@ class AStar:
                 return False
         return True
 
-    def __init__(self, space_coords: tuple, start: tuple, w_path: float, w_bend: float, w_energy: float):
+    def __init__(self, space_coords: tuple, w_path: float, w_bend: float, w_energy: float):
         """
         :param space_coords: the diagonal coords of the valid cuboid in an incremental order.
                             for example: ((0, 0), (100, 100), one must be (0, 0, 0).
@@ -73,19 +73,22 @@ class AStar:
         self.space_coords = space_coords
         self.grid_size = tuple(space_coords[1][i] - space_coords[0][i] for i in range(len(space_coords[0])))
         self.dim = len(space_coords[0])
-        assert self.dim == len(start)
-        self.start = Node(start)
         self.open_set = np.zeros(self.grid_size, dtype=np.float32)
         self.close_set = np.zeros(self.grid_size, dtype=np.float32)
         self.dir_map = np.zeros(self.grid_size, dtype=np.float32)
         self.pq = PriorityQueue()
-        self.pq.put((0, self.start))
         self.free_grid = np.ones(self.grid_size, dtype=np.uint8)  # 1 is valid
         self.set_directions()
         self.energy = np.ones(self.grid_size, dtype=np.float32) * 10
         self.w_path = w_path
         self.w_bend = w_bend
         self.w_energy = w_energy
+
+    def reinit(self):
+        self.open_set = np.zeros(self.grid_size, dtype=np.float32)
+        self.close_set = np.zeros(self.grid_size, dtype=np.float32)
+        self.dir_map = np.zeros(self.grid_size, dtype=np.float32)
+        self.pq.queue.clear()
 
     def set_directions(self):
         if self.dim == 3:
@@ -205,8 +208,11 @@ class AStar:
                 p = p.parent
         return path
 
-    def run(self, end):
+    def run(self, start, end):
         start_time = time.time()
+
+        self.start = Node(start)
+        self.pq.put((0, self.start))
 
         detailed_info = []
         while not self.pq.empty():
