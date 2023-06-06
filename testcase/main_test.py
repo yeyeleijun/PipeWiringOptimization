@@ -41,7 +41,7 @@ class test_case(unittest.TestCase):
                     axes.add_patch(rect)
                     xx, yy = np.nonzero(open_map)
                     for x_ind, y_ind in zip(xx, yy):
-                        axes.text(x_ind+0.1, y_ind+0.3, open_map[x_ind, y_ind], size=8, color="black")
+                        axes.text(x_ind+0.1, y_ind+0.3, f"{open_map[x_ind, y_ind]:.1f}", size=10, color="black")
                     axes.set_xlim([space_coords[0][0], space_coords[1][0]])
                     axes.set_ylim([space_coords[0][1], space_coords[1][1]])
                     axes.set_xticks(range(space_coords[0][0], space_coords[1][0], 1))
@@ -61,7 +61,7 @@ class test_case(unittest.TestCase):
         trace.plot_trace2(path, ax=ax)
         energy = model.energy
         for xx, yy in product(range(energy.shape[0]), range(energy.shape[1])):
-            ax.text(xx+0.1, yy+0.3, energy[xx, yy], size=8, color="black")
+            ax.text(xx+0.1, yy+0.3, f"{energy[xx, yy]:.1f}", size=10, color="black")
         ax.set_xlim([space_coords[0][0], space_coords[1][0]])
         ax.set_ylim([space_coords[0][1], space_coords[1][1]])
         ax.set_xticks(range(space_coords[0][0], space_coords[1][0], 1))

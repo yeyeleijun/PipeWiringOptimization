@@ -4,7 +4,7 @@ class Node:
         # Manhattan distance between two arbitrary points
         distance = tuple(abs(x - y) for x, y in zip(p1, p2))
         count = distance.count(1)
-        return count == len(p1) - 1
+        return count == 2
 
     def __init__(self, coord, parent=None):
         self.coord = coord
