@@ -6,6 +6,37 @@ from itertools import product
 import math
 
 
+def generate_rectangle_vertices(point1, point2, dimension):
+    if dimension == 2:
+        x1, y1 = point1
+        x2, y2 = point2
+
+        vertices = [
+            [x1, y1],
+            [x1, y2],
+            [x2, y1],
+            [x2, y2]
+        ]
+    elif dimension == 3:
+        x1, y1, z1 = point1
+        x2, y2, z2 = point2
+
+        vertices = [
+            [x1, y1, z1],
+            [x1, y1, z2],
+            [x1, y2, z1],
+            [x1, y2, z2],
+            [x2, y1, z1],
+            [x2, y1, z2],
+            [x2, y2, z1],
+            [x2, y2, z2]
+        ]
+    else:
+        raise ValueError("Invalid dimension. Only 2 or 3 dimensions are supported.")
+
+    return vertices
+
+
 class AStar:
     @staticmethod
     def manhattan_distance(p1: tuple, p2: tuple):
@@ -51,7 +82,7 @@ class AStar:
         self.pq.put((0, self.start))
         self.free_grid = np.ones(self.grid_size, dtype=np.uint8)  # 1 is valid
         self.set_directions()
-        self.energy = np.ones(self.grid_size, dtype=np.float32) * 20
+        self.energy = np.ones(self.grid_size, dtype=np.float32) * 10
 
     def set_directions(self):
         if self.dim == 3:
@@ -76,13 +107,17 @@ class AStar:
     def set_energy(self, obstacle_coords, distance=3):
 
         # set energy along the obstacle, extending 'distance' steps. [1, 2, 3] -> [5, 3, 1]
-        values = [10, 5, 1][-distance:]
+        values = [8, 4, 1][-distance:]
         for j, dis in enumerate(range(distance, 0, -1)):
             for ind in range(len(obstacle_coords)):
                 for i in range(self.dim):
                     coord0, coord1 = obstacle_coords[ind]
                     coord0 = list(map(lambda item: math.floor(item) - dis, coord0))
                     coord1 = list(map(lambda item: math.ceil(item) - 1 + dis, coord1))
+                    vertex_coord = generate_rectangle_vertices(coord0, coord1, dimension=self.dim)
+                    for diag_coord in vertex_coord:
+                        if self.coord_valid(diag_coord, self.space_coords[0], self.space_coords[1]):
+                            self.energy[tuple(diag_coord)] = values[j] * math.sqrt(2)
                     fixed_coord0 = coord0.pop(i)
                     fixed_coord1 = coord1.pop(i)
                     coord0 = [x + 1 for x in coord0]
