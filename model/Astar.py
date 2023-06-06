@@ -1,9 +1,9 @@
 import numpy as np
 from queue import PriorityQueue
-import sys
 from model.Point import Node
 import time
 from itertools import product
+import math
 
 
 class AStar:
@@ -66,8 +66,8 @@ class AStar:
         """
         for i in range(len(obstacle_coords)):
             coord0, coord1 = obstacle_coords[i]
-            coord0 = tuple(map(lambda item: int(item) - tolerance, coord0))
-            coord1 = tuple(map(lambda item: int(item) + 1 + tolerance, coord1))
+            coord0 = tuple(map(lambda item: math.floor(item) - tolerance, coord0))
+            coord1 = tuple(map(lambda item: math.ceil(item) + tolerance, coord1))
             for coord in product(*(range(s, e) for s, e in zip(coord0, coord1))):
                 if self.coord_valid(coord, self.space_coords[0], self.space_coords[1]):
                     self.free_grid[coord] = 0
@@ -80,8 +80,8 @@ class AStar:
         for j, dis in enumerate(range(distance, 0, -1)):
             for i in range(len(obstacle_coords)):
                 coord0, coord1 = obstacle_coords[i]
-                coord0 = tuple(map(lambda item: int(item) - dis, coord0))
-                coord1 = tuple(map(lambda item: int(item) + 1 + dis, coord1))
+                coord0 = tuple(map(lambda item: math.floor(item) - dis, coord0))
+                coord1 = tuple(map(lambda item: math.ceil(item) + dis, coord1))
                 for coord in product(*(range(s, e) for s, e in zip(coord0, coord1))):
                     if self.coord_valid(coord, self.space_coords[0], self.space_coords[1]):
                         self.energy[coord] = values[j]
@@ -110,7 +110,7 @@ class AStar:
         return self.manhattan_distance(p_coord, end)
 
     def total_cost(self, p, end):
-        print(p.coord, self.energy[p.coord], self.base_cost(p), self.heuristic_cost(p.coord, end))
+        # print(p.coord, self.energy[p.coord], self.base_cost(p), self.heuristic_cost(p.coord, end))
         return self.base_cost(p) + self.heuristic_cost(p.coord, end)
 
     def is_valid_point(self, p_coord: tuple):
@@ -160,12 +160,13 @@ class AStar:
     def run(self, end):
         start_time = time.time()
 
+        detailed_info = []
         while not self.pq.empty():
             # find the node with minimum cost
             curr_p = self.pq.get()[1]
             # print(f'Process Point: {curr_p.coord}')
             if self.cmp(curr_p.coord, end):  # exit if finding the end point
-                return self.build_path(curr_p)
+                return self.build_path(curr_p), detailed_info
 
             self.close_set[curr_p.coord] = 1
             self.open_set[curr_p.coord] = 0
@@ -175,5 +176,6 @@ class AStar:
                 curr_p_coord = self.add_tuple(pre_p.coord, direction)
                 curr_p = Node(curr_p_coord, parent=pre_p)
                 self.process_point(curr_p, end)
+            detailed_info.append((self.open_set.copy(), pre_p.coord))
         end_time = time.time()
         print(f"Simulation time {end_time - start_time :.3f}")
