@@ -17,6 +17,7 @@ def plot_trace2(path, ax):
         ax = fig.gca()
         ax.set_aspect("auto")
     for i in range(len(path) -1):
-        s, e = path[i], path[i+1]
-        ax.plot(*zip(s, e), color="red", lw=2., alpha=0.8)
+        s, e = np.array(path[i])+0.5, np.array(path[i+1])+0.5
+        ax.plot(*zip(s, e), color="red", lw=5., alpha=0.8)
+        ax.grid(True)
     return ax

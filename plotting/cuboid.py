@@ -17,6 +17,8 @@ def structure_cuboid(coord1, coord2, ax=None):
         if len(coord2) == 3:
             ax = fig.gca(projection='3d')
             ax.set_aspect("auto")
+            ax.set_xlim([coord1[0], coord1[1]])
+            ax.set_xlim([coord2[0], coord2[1]])
         else:
             ax = fig.gca()
             ax.set_aspect("auto")

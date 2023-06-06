@@ -51,13 +51,14 @@ class AStar:
         self.pq.put((0, self.start))
         self.free_grid = np.ones(self.grid_size, dtype=np.uint8)  # 1 is valid
         self.set_directions()
-        self.energy = np.ones(self.grid_size, dtype=np.uint8) * 10
+        self.energy = np.ones(self.grid_size, dtype=np.float32) * 100
 
     def set_directions(self):
         if self.dim == 3:
             self.directions = [(0, 1, 0), (0, -1, 0), (1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1)]
         else:
             self.directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+
     def explore_obstacle(self, obstacle_coords, tolerance=0):
         """
         :param obstacle_coords: list of all obstacles organized as tuples.
@@ -73,16 +74,9 @@ class AStar:
         return None
 
     def set_energy(self, obstacle_coords, distance=3):
-        # init the surface this 3d cuboid
-        self.energy[0, :, :] = 1
-        self.energy[-1, :, :] = 1
-        self.energy[:, 0, :] = 1
-        self.energy[:, -1, :] = 1
-        self.energy[:, :, 0] = 1
-        self.energy[:, :, -1] = 1
 
         # set energy along the obstacle, extending 'distance' steps. [1, 2, 3] -> [5, 3, 1]
-        values = [5, 3, 1][-distance:]
+        values = [50, 30, 1][-distance:]
         for j, dis in enumerate(range(distance, 0, -1)):
             for i in range(len(obstacle_coords)):
                 coord0, coord1 = obstacle_coords[i]
@@ -90,7 +84,21 @@ class AStar:
                 coord1 = tuple(map(lambda item: int(item) + 1 + dis, coord1))
                 for coord in product(*(range(s, e) for s, e in zip(coord0, coord1))):
                     if self.coord_valid(coord, self.space_coords[0], self.space_coords[1]):
-                        self.free_grid[coord] = values[j]
+                        self.energy[coord] = values[j]
+        if self.dim == 2:
+            self.energy[0, :] = 1
+            self.energy[-1, :] = 1
+            self.energy[:, 0] = 1
+            self.energy[:, -1] = 1
+        elif self.dim == 3:
+            # init the surface this 3d cuboid
+            self.energy[0, :, :] = 1
+            self.energy[-1, :, :] = 1
+            self.energy[:, 0, :] = 1
+            self.energy[:, -1, :] = 1
+            self.energy[:, :, 0] = 1
+            self.energy[:, :, -1] = 1
+        self.energy[np.where(self.free_grid == 0)] = float('inf')
         return None
 
     def base_cost(self, p, w_path=1, w_bend=1, w_energy=1):
@@ -102,6 +110,7 @@ class AStar:
         return self.manhattan_distance(p_coord, end)
 
     def total_cost(self, p, end):
+        print(p.coord, self.energy[p.coord], self.base_cost(p), self.heuristic_cost(p.coord, end))
         return self.base_cost(p) + self.heuristic_cost(p.coord, end)
 
     def is_valid_point(self, p_coord: tuple):
