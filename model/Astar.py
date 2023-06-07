@@ -64,7 +64,7 @@ class AStar:
                 return False
         return True
 
-    def __init__(self, space_coords: tuple, w_path: float, w_bend: float, w_energy: float):
+    def __init__(self, space_coords: tuple, w_path: float, w_bend: float, w_energy: float, max_energy: float):
         """
         :param space_coords: the diagonal coords of the valid cuboid in an incremental order.
                             for example: ((0, 0), (100, 100), one must be (0, 0, 0).
@@ -79,7 +79,7 @@ class AStar:
         self.pq = PriorityQueue()
         self.free_grid = np.ones(self.grid_size, dtype=np.uint8)  # 1 is valid
         self.set_directions()
-        self.energy = np.ones(self.grid_size, dtype=np.float32) * 10
+        self.energy = np.ones(self.grid_size, dtype=np.float32) * max_energy
         self.w_path = w_path
         self.w_bend = w_bend
         self.w_energy = w_energy
@@ -110,10 +110,11 @@ class AStar:
                     self.free_grid[coord] = 0
         return None
 
-    def set_energy(self, obstacle_coords, distance=3):
+    def set_energy(self, obstacle_coords, values, distance=3):
 
         # set energy along the obstacle, extending 'distance' steps. [1, 2, 3] -> [5, 3, 1]
-        values = [8, 4, 1][-distance:]
+        assert len(values) == distance
+        values = values[-distance:]
         for j, dis in enumerate(range(distance, 0, -1)):
             for ind in range(len(obstacle_coords)):
                 for i in range(self.dim):
