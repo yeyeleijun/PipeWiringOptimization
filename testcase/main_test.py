@@ -3,10 +3,11 @@
 # @Time    : 2023/6/2 9:52
 # @Author  : Leijun Ye
 import numpy as np
-from model.Astar import AStar
 import unittest
 import matplotlib.pyplot as plt
-from plotting import cuboid, trace
+from mayavi import mlab
+from model.Astar import AStar
+from plotting import cuboid, trace, dim3plot
 from itertools import product
 import matplotlib.animation as anime
 from utils.functions import tuple_operations
@@ -14,7 +15,7 @@ color_list = ["#DE47AB", "#72BE97", "#F7F797", "#7C749B", "#E85726"]
 
 
 class test_case(unittest.TestCase):
-    def test_dim2_with_obstacle(self):
+    def _test_dim2_with_obstacle(self):
         space_coords = ((0, 0), (100, 100))  # coords
         obstacle_coord = [[(20, 30), (40, 60)], [(50, 20), (70, 80)]]
         start = [(10, 50), (5, 10)]
@@ -105,38 +106,44 @@ class test_case(unittest.TestCase):
         fig.savefig("trace.png")
         plt.close(fig)
 
-    def _test_dim3_with_obstacle(self):
-        space_coords = ((0, 0, 0), (10, 10, 10))  # coords
-        start = (0, 2, 2)
-        end = (8, 6, 4)  # grip id
-        model = AStar(space_coords, start)
-        obstacle_coord = [[(0, 4, 2), (4, 9, 6)], [(3, 0, 2), (5, 2, 6)], [(4, 4, 2), (6, 5, 6)]]
+    def test_dim3_with_obstacle(self):
+        space_coords = ((0, 0, 0), (100, 100, 100))  # coords
+        obstacle_coord = [[(20, 30, 20), (40, 60, 50)], [(50, 20, 10), (70, 80, 70)]]
+        start = [(10, 50, 50), (5, 10, 0)]
+        end = [(60, 99, 100), (90, 50, 0)]  # grip id
+        n_pipe = 1
+        model = AStar(space_coords, w_path=1, w_bend=1, w_energy=1, max_energy=100, min_dis_bend=5)
+        energy_value_obstacle = np.arange(5, 16)
+        energy_value_path = np.repeat([1, 5], 5)
+
+        # run model
         model.explore_obstacle(obstacle_coord)
-        # model.set_energy(obstacle_coord, distance=3)
-        path = model.run(end)
-        # print(path)
+        model.set_energy(obstacle_coord, values=energy_value_obstacle, distance=len(energy_value_obstacle))
+        paths = []
+        bend_points = []
+        for pipe_i in range(n_pipe):
+            print(f"Processing pipe: {pipe_i}")
+            (path, bend_point), info = model.run(start[pipe_i], end[pipe_i])
+            if pipe_i < n_pipe - 1:
+                model.free_grid[tuple(zip(*path))] = 0
+                for factor in range(1, len(energy_value_path), 1):
+                    neighboors = [tuple_operations(item, tuple_operations(direction, factor, '*'), '+') for item in path for direction in model.directions]
+                    for item in neighboors:
+                        if model.is_valid_point(item):
+                            model.energy[item] = min(energy_value_path[factor], model.energy[item])
+                model.energy[tuple(zip(*path))] = float('inf')
+            model.reinit()
+            paths.append(path)
+            bend_points.append(bend_point)
+            print(bend_point)
 
-        fig = plt.figure(figsize=(10, 10))
-        ax = fig.add_subplot(projection='3d')
-        ax.set_aspect("auto")
-        cuboid.structure_cuboid(space_coords[0], space_coords[1], ax=ax)
+        fig = mlab.figure(figure=1, size=(400, 350))
+        dim3plot.structure_cuboid((0, 0, 0), (100, 100, 100))
         for k in range(len(obstacle_coord)):
-            cuboid.shadow_cuboid(obstacle_coord[k][0], obstacle_coord[k][1], ax=ax)
-        trace.plot_trace3(path, ax=ax)
-        # ax.view_init(30, 60)
-        # ax.axis("off")
-
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
-        ax.set_zlabel("z")
-        # ax.set_xticks([])
-        # ax.set_yticks([])
-        # ax.set_zticks([])
-        # for angle in range(0, 360):
-        #     ax.view_init(30, angle)
-        #     plt.draw()
-        #     plt.pause(.001)
-        fig.show()
+            dim3plot.surface_cuboid(obstacle_coord[k][0], obstacle_coord[k][1], name=f"obstacle{k}")
+        for k in range(n_pipe):
+            dim3plot.trace_plot(bend_points[k])
+        mlab.show()
 
 
 if __name__ == '__main__':

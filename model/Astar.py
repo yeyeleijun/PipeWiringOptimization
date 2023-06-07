@@ -34,22 +34,22 @@ class AStar:
         self.space_coords = space_coords
         self.grid_size = tuple(space_coords[1][i] - space_coords[0][i] for i in range(len(space_coords[0])))
         self.dim = len(space_coords[0])
-        self.open_set = np.zeros(self.grid_size, dtype=np.float32)
-        self.close_set = np.zeros(self.grid_size, dtype=np.float32)
-        self.dir_map = np.zeros(self.grid_size, dtype=np.float32)
+        self.open_set = np.zeros(self.grid_size, dtype=np.float16)
+        self.close_set = np.zeros(self.grid_size, dtype=np.float16)
+        self.dir_map = np.zeros(self.grid_size, dtype=np.float16)
         self.pq = PriorityQueue()
         self.free_grid = np.ones(self.grid_size, dtype=np.uint8)  # 1 is valid
         self.set_directions()
-        self.energy = np.ones(self.grid_size, dtype=np.float32) * max_energy
+        self.energy = np.ones(self.grid_size, dtype=np.float16) * max_energy
         self.w_path = w_path
         self.w_bend = w_bend
         self.w_energy = w_energy
         self.min_dis_bend = min_dis_bend
 
     def reinit(self):
-        self.open_set = np.zeros(self.grid_size, dtype=np.float32)
-        self.close_set = np.zeros(self.grid_size, dtype=np.float32)
-        self.dir_map = np.zeros(self.grid_size, dtype=np.float32)
+        self.open_set = np.zeros(self.grid_size, dtype=np.float16)
+        self.close_set = np.zeros(self.grid_size, dtype=np.float16)
+        self.dir_map = np.zeros(self.grid_size, dtype=np.float16)
         self.pq.queue.clear()
 
     def set_directions(self):
@@ -208,6 +208,6 @@ class AStar:
                 curr_p_coord = tuple_operations(pre_p.coord, direction, '+')
                 curr_p = Node(curr_p_coord, parent=pre_p)
                 self.process_point(curr_p, end)
-            detailed_info.append((self.open_set.copy(), pre_p.coord))
+            # detailed_info.append((self.open_set.copy(), pre_p.coord))
         end_time = time.time()
         print(f"Simulation time {end_time - start_time :.3f}")

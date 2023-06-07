@@ -1,7 +1,8 @@
 import os
-os.environ ['ETS_TOOLKIT'] = 'qt4'
+# os.environ ['ETS_TOOLKIT'] = 'qt4'
 import numpy as np
 from mayavi import mlab
+
 
 def surface_cuboid(coord1: tuple, coord2: tuple, name="obstacle1"):
     l = abs(coord2[0] - coord1[0])
@@ -48,11 +49,15 @@ def structure_cuboid(coord1, coord2):
         [4, 5, 7, 6]
     ]
     for face in faces:
-        x = [vertices[face[0]][0], vertices[face[1]][0], vertices[face[2]][0], vertices[face[3]][0], vertices[face[0]][0]]
-        y = [vertices[face[0]][1], vertices[face[1]][1], vertices[face[2]][1], vertices[face[3]][1], vertices[face[0]][1]]
-        z = [vertices[face[0]][2], vertices[face[1]][2], vertices[face[2]][2], vertices[face[3]][2], vertices[face[0]][2]]
+        x = [vertices[face[0]][0], vertices[face[1]][0], vertices[face[2]][0], vertices[face[3]][0],
+             vertices[face[0]][0]]
+        y = [vertices[face[0]][1], vertices[face[1]][1], vertices[face[2]][1], vertices[face[3]][1],
+             vertices[face[0]][1]]
+        z = [vertices[face[0]][2], vertices[face[1]][2], vertices[face[2]][2], vertices[face[3]][2],
+             vertices[face[0]][2]]
         mlab.plot3d(x, y, z, tube_radius=None, opacity=0.7)
     mlab.axes(extent=[x1, x2, y1, y2, z1, z2])
+
 
 def trace_plot(path):
     xx = [item[0] for item in path]
@@ -60,11 +65,11 @@ def trace_plot(path):
     zz = [item[2] for item in path]
     mlab.plot3d(xx, yy, zz, tube_radius=2., color=(0.8, 0.2, 0.2), opacity=0.8)
 
-fig = mlab.figure(figure=1, size=(400, 350))
-structure_cuboid((0, 0, 0), (100, 100, 100))
-surface_cuboid((0, 0, 0), (10, 10, 40), name="obstacle1")
-surface_cuboid((20, 40, 50), (80, 60, 70), name="obstacle2")
-trace_plot(((0, 0, 40), (50, 0, 40), (50, 100, 40), (100, 100, 40)))
-mlab.show()
 
-
+if __name__ == '__main__':
+    fig = mlab.figure(figure=1, size=(400, 350))
+    structure_cuboid((0, 0, 0), (100, 100, 100))
+    surface_cuboid((0, 0, 0), (10, 10, 40), name="obstacle1")
+    surface_cuboid((20, 40, 50), (80, 60, 70), name="obstacle2")
+    trace_plot(((0, 0, 40), (50, 0, 40), (50, 100, 40), (100, 100, 40)))
+    mlab.show()
