@@ -3,24 +3,26 @@
 # @Time    : 2023/6/2 9:52
 # @Author  : Leijun Ye
 import numpy as np
-
 from model.Astar import AStar
 import unittest
 import matplotlib.pyplot as plt
 from plotting import cuboid, trace
 from itertools import product
 import matplotlib.animation as anime
-
+from utils.functions import tuple_operations
 color_list = ["#DE47AB", "#72BE97", "#F7F797", "#7C749B", "#E85726"]
+
 
 class test_case(unittest.TestCase):
     def test_dim2_with_obstacle(self):
         space_coords = ((0, 0), (100, 100))  # coords
         obstacle_coord = [[(20, 30), (40, 60)], [(50, 20), (70, 80)]]
-        start = [(10, 20), (45, 60)]
-        end = [(80, 50), (90, 40)]  # grip id
+        start = [(10, 50), (5, 10)]
+        end = [(99, 50), (90, 50)]  # grip id
         n_pipe = len(start)
-        model = AStar(space_coords, w_path=1, w_bend=1, w_energy=1, max_energy=21)
+        model = AStar(space_coords, w_path=1, w_bend=1, w_energy=1, max_energy=100, min_dis_bend=5)
+        energy_value_obstacle = np.arange(5, 16)
+        energy_value_path = np.repeat([1, 5], 5)
 
         # show building and obstacle position
         fig = plt.figure(figsize=(10, 10))
@@ -29,9 +31,9 @@ class test_case(unittest.TestCase):
         cuboid.structure_cuboid(space_coords[0], space_coords[1], ax=ax)
         for k in range(len(obstacle_coord)):
             cuboid.shadow_cuboid(obstacle_coord[k][0], obstacle_coord[k][1], ax=ax)
-        for k in range(n_pipe):
-            ax.text(start[k][0] + 0.1, start[k][1] + 0.2, "start", size=15, color="red")
-            ax.text(end[k][0] + 0.1, end[k][1] + 0.2, "end", size=15, color="red")
+        for k in range(1):
+            ax.text(start[k][0] + 0.1, start[k][1] + 0.2, "start", size=15, color=color_list[k])
+            ax.text(end[k][0] + 0.1, end[k][1] + 0.2, "end", size=15, color=color_list[k])
         ax.set_xlim([space_coords[0][0], space_coords[1][0]])
         ax.set_ylim([space_coords[0][1], space_coords[1][1]])
         ax.set_xticks(range(space_coords[0][0], space_coords[1][0], 1))
@@ -46,19 +48,24 @@ class test_case(unittest.TestCase):
 
         # run model
         model.explore_obstacle(obstacle_coord)
-        model.set_energy(obstacle_coord, values=np.arange(1, 21, 2), distance=10)
+        model.set_energy(obstacle_coord, values=energy_value_obstacle, distance=len(energy_value_obstacle))
         paths = []
+        bend_points = []
         for pipe_i in range(n_pipe):
-            path, info = model.run(start[pipe_i], end[pipe_i])
+            print(f"Processing pipe: {pipe_i}")
+            (path, bend_point), info = model.run(start[pipe_i], end[pipe_i])
             if pipe_i < n_pipe - 1:
                 model.free_grid[tuple(zip(*path))] = 0
-                neighboors = [model.add_tuple(item, direction) for item in path for direction in model.directions]
-                for item in neighboors:
-                    if model.is_valid_point(item):
-                        model.energy[item] = 1
+                for factor in range(1, len(energy_value_path), 1):
+                    neighboors = [tuple_operations(item, tuple_operations(direction, factor, '*'), '+') for item in path for direction in model.directions]
+                    for item in neighboors:
+                        if model.is_valid_point(item):
+                            model.energy[item] = min(energy_value_path[factor], model.energy[item])
                 model.energy[tuple(zip(*path))] = float('inf')
             model.reinit()
             paths.append(path)
+            bend_points.append(bend_point)
+            print(bend_point)
 
         # plot gif, showing the searching process
         gif = False

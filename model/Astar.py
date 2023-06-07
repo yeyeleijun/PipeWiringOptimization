@@ -4,45 +4,10 @@ from model.Point import Node
 import time
 from itertools import product
 import math
-
-
-def generate_rectangle_vertices(point1, point2, dimension):
-    if dimension == 2:
-        x1, y1 = point1
-        x2, y2 = point2
-
-        vertices = [
-            [x1, y1],
-            [x1, y2],
-            [x2, y1],
-            [x2, y2]
-        ]
-    elif dimension == 3:
-        x1, y1, z1 = point1
-        x2, y2, z2 = point2
-
-        vertices = [
-            [x1, y1, z1],
-            [x1, y1, z2],
-            [x1, y2, z1],
-            [x1, y2, z2],
-            [x2, y1, z1],
-            [x2, y1, z2],
-            [x2, y2, z1],
-            [x2, y2, z2]
-        ]
-    else:
-        raise ValueError("Invalid dimension. Only 2 or 3 dimensions are supported.")
-
-    return vertices
+from utils.functions import tuple_operations, generate_rectangle_vertices, manhattan_distance
 
 
 class AStar:
-    @staticmethod
-    def manhattan_distance(p1: tuple, p2: tuple):
-        # Manhattan distance between two arbitrary points
-        distance = (abs(x - y) for x, y in zip(p1, p2))
-        return sum(distance)
 
     @staticmethod
     def cmp(p1: tuple, p2: tuple):
@@ -50,10 +15,6 @@ class AStar:
             if x != y:
                 return False
         return True
-
-    @staticmethod
-    def add_tuple(p1: tuple, p2: tuple):
-        return tuple(x + y for x, y in zip(p1, p2))
 
     @staticmethod
     def coord_valid(coord, coord_lb, coord_rt):
@@ -64,7 +25,7 @@ class AStar:
                 return False
         return True
 
-    def __init__(self, space_coords: tuple, w_path: float, w_bend: float, w_energy: float, max_energy: float):
+    def __init__(self, space_coords: tuple, w_path: float, w_bend: float, w_energy: float, max_energy: float, min_dis_bend: int):
         """
         :param space_coords: the diagonal coords of the valid cuboid in an incremental order.
                             for example: ((0, 0), (100, 100), one must be (0, 0, 0).
@@ -83,6 +44,7 @@ class AStar:
         self.w_path = w_path
         self.w_bend = w_bend
         self.w_energy = w_energy
+        self.min_dis_bend = min_dis_bend
 
     def reinit(self):
         self.open_set = np.zeros(self.grid_size, dtype=np.float32)
@@ -159,7 +121,7 @@ class AStar:
 
     def heuristic_cost(self, p_coord, end):
         # Manhattan distance between current point and end point
-        return self.manhattan_distance(p_coord, end)
+        return manhattan_distance(p_coord, end)
 
     def total_cost(self, p, end):
         # print(p.coord, self.energy[p.coord], self.base_cost(p), self.heuristic_cost(p.coord, end))
@@ -171,15 +133,24 @@ class AStar:
         else:
             return False
 
-    def is_in_open_set(self, p: tuple):
-        if self.open_set[p] > 0:
+    def is_in_open_set(self, p_coord: tuple):
+        if self.open_set[p_coord] > 0:
             return True
         return False
 
-    def is_in_close_set(self, p: tuple):
-        if self.close_set[p] == 1:
+    def is_in_close_set(self, p_coord: tuple):
+        if self.close_set[p_coord] == 1:
             return True
         return False
+
+    def is_feasible_bend_point(self, p):
+        p_n_cp = p.n_cp
+        k = -1  # the point number between two bend points
+        while p.parent and p.parent.n_cp >= p_n_cp - 1:
+            p = p.parent
+            k += 1
+        # print(list(abs(x - y) for x, y in zip(p_coord, end)))
+        return k >= self.min_dis_bend
 
     def process_point(self, curr_p, end):
         curr_p_coord = curr_p.coord
@@ -187,6 +158,8 @@ class AStar:
             return None  # Do nothing for invalid point
         if self.is_in_close_set(curr_p_coord):
             return None  # Do nothing for visited point
+        if curr_p.n_cp == curr_p.parent.n_cp + 1 and not self.is_feasible_bend_point(curr_p):
+            return None
 
         p_cost = self.total_cost(curr_p, end)
         if not self.is_in_open_set(curr_p_coord):
@@ -201,13 +174,17 @@ class AStar:
 
     def build_path(self, p):
         path = []
+        bend_point = [p.coord]
         while True:
             path.insert(0, p.coord)  # Insert first
             if self.cmp(p.coord, self.start.coord):
                 break
             else:
+                if p.n_cp == p.parent.n_cp + 1:
+                    bend_point.insert(0, p.parent.coord)
                 p = p.parent
-        return path
+        bend_point.insert(0, self.start.coord)
+        return path, bend_point
 
     def run(self, start, end):
         start_time = time.time()
@@ -228,7 +205,7 @@ class AStar:
 
             pre_p = curr_p
             for direction in self.directions:
-                curr_p_coord = self.add_tuple(pre_p.coord, direction)
+                curr_p_coord = tuple_operations(pre_p.coord, direction, '+')
                 curr_p = Node(curr_p_coord, parent=pre_p)
                 self.process_point(curr_p, end)
             detailed_info.append((self.open_set.copy(), pre_p.coord))
