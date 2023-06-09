@@ -25,7 +25,7 @@ class AStar:
                 return False
         return True
 
-    def __init__(self, space_coords: tuple, w_path: float, w_bend: float, w_energy: float, max_energy: float, min_dis_bend: int):
+    def __init__(self, space_coords: tuple, w_path: float, w_bend: float, w_energy: float, max_energy: float, min_dis_bend: int, gif=False):
         """
         :param space_coords: the diagonal coords of the valid cuboid in an incremental order.
                             for example: ((0, 0), (100, 100), one must be (0, 0, 0).
@@ -45,6 +45,7 @@ class AStar:
         self.w_bend = w_bend
         self.w_energy = w_energy
         self.min_dis_bend = min_dis_bend
+        self.gif = gif
 
     def reinit(self):
         self.open_set = np.zeros(self.grid_size, dtype=np.float16)
@@ -76,7 +77,7 @@ class AStar:
 
         # set energy along the obstacle, extending 'distance' steps. [1, 2, 3] -> [5, 3, 1]
         assert len(values) == distance
-        values = values[-distance:]
+        values = values[::-1]
         for j, dis in enumerate(range(distance, 0, -1)):
             for ind in range(len(obstacle_coords)):
                 for i in range(self.dim):
@@ -99,24 +100,24 @@ class AStar:
                         coord_new2.insert(i, fixed_coord1)
                         if self.coord_valid(coord_new2, self.space_coords[0], self.space_coords[1]):
                             self.energy[tuple(coord_new2)] = values[j]
-        if self.dim == 2:
-            self.energy[0, :] = 1
-            self.energy[-1, :] = 1
-            self.energy[:, 0] = 1
-            self.energy[:, -1] = 1
-        elif self.dim == 3:
-            # init the surface this 3d cuboid
-            self.energy[0, :, :] = 1
-            self.energy[-1, :, :] = 1
-            self.energy[:, 0, :] = 1
-            self.energy[:, -1, :] = 1
-            self.energy[:, :, 0] = 1
-            self.energy[:, :, -1] = 1
+        # if self.dim == 2:
+        #     self.energy[0, :] = 1
+        #     self.energy[-1, :] = 1
+        #     self.energy[:, 0] = 1
+        #     self.energy[:, -1] = 1
+        # elif self.dim == 3:
+        #     # init the surface this 3d cuboid
+        #     self.energy[0, :, :] = 1
+        #     self.energy[-1, :, :] = 1
+        #     self.energy[:, 0, :] = 1
+        #     self.energy[:, -1, :] = 1
+        #     self.energy[:, :, 0] = 1
+        #     self.energy[:, :, -1] = 1
         self.energy[np.where(self.free_grid == 0)] = float('inf')
         return None
 
     def base_cost(self, p):
-        f = self.w_path * p.depth + self.w_bend * p.n_cp + self.energy[p.coord] * self.w_energy
+        f = self.w_path * p.depth + self.w_bend * p.n_cp + self.w_energy * p.energy
         return f
 
     def heuristic_cost(self, p_coord, end):
@@ -154,10 +155,10 @@ class AStar:
 
     def process_point(self, curr_p, end):
         curr_p_coord = curr_p.coord
-        if not self.is_valid_point(curr_p_coord):
-            return None  # Do nothing for invalid point
-        if self.is_in_close_set(curr_p_coord):
-            return None  # Do nothing for visited point
+        # if not self.is_valid_point(curr_p_coord):
+        #     return None  # Do nothing for invalid point
+        # if self.is_in_close_set(curr_p_coord):
+        #     return None  # Do nothing for visited point
         if curr_p.n_cp == curr_p.parent.n_cp + 1 and not self.is_feasible_bend_point(curr_p):
             return None
 
@@ -189,7 +190,7 @@ class AStar:
     def run(self, start, end):
         start_time = time.time()
 
-        self.start = Node(start)
+        self.start = Node(start, energy=self.energy[start])
         self.pq.put((0, self.start))
 
         detailed_info = []
@@ -200,14 +201,21 @@ class AStar:
             if self.cmp(curr_p.coord, end):  # exit if finding the end point
                 return self.build_path(curr_p), detailed_info
 
+            if curr_p.coord == (18, 16):
+                print("here")
             self.close_set[curr_p.coord] = 1
             self.open_set[curr_p.coord] = 0
 
             pre_p = curr_p
             for direction in self.directions:
                 curr_p_coord = tuple_operations(pre_p.coord, direction, '+')
-                curr_p = Node(curr_p_coord, parent=pre_p)
+                if not self.is_valid_point(curr_p_coord):
+                    continue  # Do nothing for invalid point
+                if self.is_in_close_set(curr_p_coord):
+                    continue  # Do nothing for visited point
+                curr_p = Node(curr_p_coord, parent=pre_p, energy=self.energy[curr_p_coord])
                 self.process_point(curr_p, end)
-            # detailed_info.append((self.open_set.copy(), pre_p.coord))
+            if self.gif:
+                detailed_info.append((self.open_set.copy(), pre_p.coord))
         end_time = time.time()
         print(f"Simulation time {end_time - start_time :.3f}")

@@ -6,15 +6,17 @@ class Node:
         count = distance.count(1)
         return count == 2
 
-    def __init__(self, coord, parent=None):
+    def __init__(self, coord, parent=None, energy=None):
         self.coord = coord
         self.parent = parent
 
         if self.parent is None:
             self.depth = 1
             self.n_cp = 0
+            self.energy = energy
         else:
             self.depth = self.parent.depth + 1
+            self.energy = self.parent.energy + energy
             self.n_cp = self.parent.n_cp
             if self.parent.parent is not None:
                 if self.change_point(self.parent.parent.coord, self.coord):

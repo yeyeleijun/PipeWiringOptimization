@@ -63,7 +63,7 @@ def trace_plot(path):
     xx = [item[0] for item in path]
     yy = [item[1] for item in path]
     zz = [item[2] for item in path]
-    mlab.plot3d(xx, yy, zz, tube_radius=2., color=(0.8, 0.2, 0.2), opacity=0.8)
+    mlab.plot3d(xx, yy, zz, tube_radius=1., color=(1., 1., 1.), opacity=0.8)
 
 
 if __name__ == '__main__':
