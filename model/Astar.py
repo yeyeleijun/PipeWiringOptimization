@@ -124,9 +124,10 @@ class AStar:
         # Manhattan distance between current point and end point
         return manhattan_distance(p_coord, end)
 
-    def total_cost(self, p, end):
+    def total_cost(self, p):
         # print(p.coord, self.energy[p.coord], self.base_cost(p), self.heuristic_cost(p.coord, end))
-        return self.base_cost(p) + self.heuristic_cost(p.coord, end)
+        # print(list(map(lambda x: self.heuristic_cost(p.coord, x), self.end_nodes)))
+        return self.base_cost(p) + min(list(map(lambda x: self.heuristic_cost(p.coord, x), self.end_nodes)))
 
     def is_valid_point(self, p_coord: tuple):
         if self.coord_valid(p_coord, self.space_coords[0], self.space_coords[1]) and self.free_grid[p_coord]:
@@ -153,16 +154,12 @@ class AStar:
         # print(list(abs(x - y) for x, y in zip(p_coord, end)))
         return k >= self.min_dis_bend
 
-    def process_point(self, curr_p, end):
+    def process_point(self, curr_p):
         curr_p_coord = curr_p.coord
-        # if not self.is_valid_point(curr_p_coord):
-        #     return None  # Do nothing for invalid point
-        # if self.is_in_close_set(curr_p_coord):
-        #     return None  # Do nothing for visited point
         if curr_p.n_cp == curr_p.parent.n_cp + 1 and not self.is_feasible_bend_point(curr_p):
-            return None
+            return None  # district the minimum distance between two bend point
 
-        p_cost = self.total_cost(curr_p, end)
+        p_cost = self.total_cost(curr_p)
         if not self.is_in_open_set(curr_p_coord):
             self.open_set[curr_p_coord] = p_cost
             self.pq.put((p_cost, curr_p))
@@ -178,31 +175,36 @@ class AStar:
         bend_point = [p.coord]
         while True:
             path.insert(0, p.coord)  # Insert first
-            if self.cmp(p.coord, self.start.coord):
+            if p.parent is None:  # p is start point
+                bend_point.insert(0, p.coord)
                 break
-            else:
-                if p.n_cp == p.parent.n_cp + 1:
-                    bend_point.insert(0, p.parent.coord)
-                p = p.parent
-        bend_point.insert(0, self.start.coord)
+            if p.n_cp == p.parent.n_cp + 1:
+                bend_point.insert(0, p.parent.coord)
+            p = p.parent
         return path, bend_point
-
-    def run(self, start, end):
+        
+    def run(self, start_nodes, end_nodes, diameter=1):
         start_time = time.time()
+        if isinstance(start_nodes, tuple):
+            start_nodes = [start_nodes]
+        if isinstance(end_nodes, tuple):
+            end_nodes = [end_nodes]
 
-        self.start = Node(start, energy=self.energy[start])
-        self.pq.put((0, self.start))
+        for k in range(len(start_nodes)):
+            start_node = start_nodes[k]
+            start_p = Node(start_node, energy=self.energy[start_node])
+            self.pq.put((0, start_p))
+
+        self.end_nodes = end_nodes
+        self.diameter = diameter
 
         detailed_info = []
         while not self.pq.empty():
             # find the node with minimum cost
             curr_p = self.pq.get()[1]
             # print(f'Process Point: {curr_p.coord}')
-            if self.cmp(curr_p.coord, end):  # exit if finding the end point
+            if curr_p.coord in end_nodes:  # exit if finding the end point
                 return self.build_path(curr_p), detailed_info
-
-            if curr_p.coord == (18, 16):
-                print("here")
             self.close_set[curr_p.coord] = 1
             self.open_set[curr_p.coord] = 0
 
@@ -214,7 +216,7 @@ class AStar:
                 if self.is_in_close_set(curr_p_coord):
                     continue  # Do nothing for visited point
                 curr_p = Node(curr_p_coord, parent=pre_p, energy=self.energy[curr_p_coord])
-                self.process_point(curr_p, end)
+                self.process_point(curr_p)
             if self.gif:
                 detailed_info.append((self.open_set.copy(), pre_p.coord))
         end_time = time.time()
