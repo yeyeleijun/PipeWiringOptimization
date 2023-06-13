@@ -51,6 +51,7 @@ def tuple_operations(t1, t2, operator):
         raise TypeError("Unsupported type of t2! Only Tuple, int, and float are supported.")
     return result
 
+
 def generate_rectangle_vertices(point1, point2, dimension):
     if dimension == 2:
         x1, y1 = point1
@@ -86,3 +87,56 @@ def manhattan_distance(t1: tuple, t2: tuple):
     # Manhattan distance between two arbitrary points
     distance = (abs(x - y) for x, y in zip(t1, t2))
     return sum(distance)
+
+
+def get_parallel_line(bend_points, direction_str):
+    if direction_str == "right_down":
+        direction = (1, -1)
+    elif direction_str == "left_up":
+        direction = (-1, 1)
+    else:
+        raise ValueError("Invalid directions!")
+    bend_points_new = []
+    if bend_points[0][0] == bend_points[1][0]:  # x不变，与y轴平行
+        bend_points_new.append((bend_points[0][0] + direction[0], bend_points[0][1]))
+    else:
+        bend_points_new.append((bend_points[0][0], bend_points[0][1] + direction[1]))
+
+    for i in range(1, len(bend_points) - 1):
+        bend_points_new.append(tuple_operations(bend_points[i], direction, '+'))
+
+    if bend_points[-1][0] == bend_points[-2][0]:  # x不变，与y轴平行
+        bend_points_new.append((bend_points[-1][0] + direction[0], bend_points[-1][1]))
+    else:
+        bend_points_new.append((bend_points[-1][0], bend_points[-1][1] + direction[1]))
+    return bend_points_new
+
+
+def generate_path_from_bend_points(bend_points):
+    dims = len(bend_points[0])
+    path = []
+    for k in range(1, len(bend_points)):
+        p1 = bend_points[k - 1]
+        p2 = bend_points[k]
+
+        # Iterate over each dimension
+        for dim in range(dims):
+
+            if p1[dim] == p2[dim]:
+                continue
+
+            # Determine the direction in this dimension
+            if p1[dim] < p2[dim]:
+                step = 1
+            else:
+                step = -1
+
+            # Iterate over this dimension
+            for coord in range(p1[dim], p2[dim], step):
+                # Append the current coordinates to the path
+                path.append(tuple(coord if i == dim else p1[i] for i in range(dims)))
+
+    path.append(bend_points[-1])
+
+    # Return the path
+    return path
