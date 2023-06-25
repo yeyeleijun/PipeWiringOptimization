@@ -174,12 +174,15 @@ class AStar:
         # print(list(abs(x - y) for x, y in zip(p_coord, end)))
         return k >= self.min_dis_bend
 
-    def process_point(self, curr_p, end):
+    def process_point(self, curr_p, end_info):
         curr_p_coord = curr_p.coord
-        if curr_p.n_cp == curr_p.parent.n_cp + 1 and not self.is_feasible_bend_point(curr_p):
-            return None  # district the minimum distance between two bend point
+        if curr_p.n_cp == curr_p.parent.n_cp + 1:
+            if self.is_feasible_bend_point(curr_p) or self.cmp(curr_p.coord, end_info[0]) and curr_p.direction == end_info[1] or curr_p.depth == 2:
+                pass
+            else:
+                return None  # district the minimum distance between two bend point
 
-        p_cost = self.total_cost(curr_p, end)
+        p_cost = self.total_cost(curr_p, end_info[0])
         if not self.is_in_open_set(curr_p_coord):
             self.open_set[curr_p_coord] = p_cost
             self.pq.put((p_cost, curr_p))
@@ -245,7 +248,7 @@ class AStar:
                     continue  # Do nothing for visited point
                 edge_cost = self.edge_cost[(curr_p_coord, direction[1])]
                 curr_p = Node((curr_p_coord, direction[1]), parent=pre_p, edge_cost=edge_cost)
-                self.process_point(curr_p, end=end_info[0])
+                self.process_point(curr_p, end_info=end_info)
 
 
 if __name__ == '__main__':
