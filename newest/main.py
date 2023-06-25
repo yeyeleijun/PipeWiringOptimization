@@ -16,7 +16,7 @@ from utils.functions import tuple_operations, manhattan_distance
 
 
 class Node:
-    def __init__(self, coord_info, parent=None, energy=None):
+    def __init__(self, coord_info, parent=None, energy=None, edge_cost=0.):
         self.id = coord_info
         self.coord = coord_info[0]
         self.parent = parent
@@ -36,8 +36,10 @@ class Node:
         if self.parent is None:
             self.depth = 1
             self.n_cp = 0
+            self.edge_cost = edge_cost
             self.energy = 1 if coord_info[1] == "z" else 0
         else:
+            self.edge_cost = self.parent.edge_cost + edge_cost
             energy = 1 if coord_info[1] == "z" else 0
             self.energy = self.parent.energy + energy
             if self.parent.id[1] != self.id[1]:
@@ -119,7 +121,7 @@ class AStar:
                 self.vir_vertex.append((item, direction))
 
     def base_cost(self, p):
-        f = self.w_path * p.depth + self.w_bend * p.n_cp + self.w_energy * p.energy
+        f = self.w_path * p.edge_cost + self.w_bend * p.n_cp + self.w_energy * p.energy
         return f
 
     def heuristic_cost(self, p_coord, end):
@@ -148,6 +150,9 @@ class AStar:
         distance = manhattan_distance(p_n_coord, p.coord)
         return distance >= self.min_dis_bend
 
+    def covering_list(self, path: list):
+        pass
+
     def process_point(self, curr_p, end):
         curr_p_coord = curr_p.coord
 
@@ -167,23 +172,27 @@ class AStar:
             pass
 
     def build_path(self, p):
+        bend_path = []
         path = []
+        bend_path.insert(0, p.id)  # Insert first
         path.insert(0, p.id)  # Insert first
         while True:
             if self.cmp(p.coord, self.start.coord):
                 break
             else:
+                path.insert(0, p.id)
                 if p.n_cp == p.parent.n_cp + 1:
-                    path.insert(0, p.parent.id)
+                    bend_path.insert(0, p.parent.id)
                 p = p.parent
+        bend_path.insert(0, self.start.id)
         path.insert(0, self.start.id)
-        return path
+        return bend_path, path
 
     def run(self, start, end):
         # for example start: ((5, 7, 0), "x"); end: ((0, 99, 77), "y");
         start_time = time.time()
 
-        self.start = Node(start, energy=None)
+        self.start = Node(start, energy=None, edge_cost=0.)
         self.pq.put((0, self.start))
 
         while not self.pq.empty():
@@ -207,6 +216,17 @@ class AStar:
         end_time = time.time()
         print(f"Simulation time {end_time - start_time :.3f}")
 
+    def seq_run(self, starts: list, ends: list):
+        n_pipes = len(starts)
+        assert n_pipes == len(ends)
+        for i in range(n_pipes):
+            _, path = self.run(starts[i], ends[i])
+            covering_vertex = self.covering_list(path)
+            self.pq.queue.clear()
+            for vertex in covering_vertex:
+                pass
+
+
 
 if __name__ == '__main__':
     space_coords = ((0, 0, 0), (6, 6, 6))  # coords
@@ -215,5 +235,5 @@ if __name__ == '__main__':
     end = ((5, 5, 4), "z")
     n_pipe = 1
     model = AStar(space_coords, obstacle_coord, w_path=1, w_bend=1, w_energy=1, min_dis_bend=2)
-    path = model.run(start, end)
-    print(path)
+    bend_path, _ = model.run(start, end)
+    print(bend_path)
