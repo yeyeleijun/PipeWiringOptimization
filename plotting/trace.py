@@ -15,20 +15,13 @@ def plot_trace3(path, ax):
     return ax
 
 
-def plot_trace2(path, bend_points, ax, c, diameter):
+def plot_trace2(path, ax, c):
     if ax is None:
         fig = plt.figure(figsize=(10, 10))
         ax = fig.gca()
         ax.set_aspect("auto")
-    bend_points_all = [bend_points]
-    bend_points_all.append(get_parallel_line(bend_points, 'left_up'))
-    bend_points_all.append(get_parallel_line(bend_points, 'right_down'))
-    for bend_points in bend_points_all:
-        path = generate_path_from_bend_points(bend_points)
-        for i in range(len(path)):
-            rec = Rectangle(path[i], diameter, diameter, color=c, alpha=0.2)
-            ax.add_patch(rec)
-        for i in range(len(bend_points) - 1):
-            s, e = np.array(bend_points[i])+0.5, np.array(bend_points[i+1])+0.5
-            ax.plot(*zip(s, e), color=c, lw=5., alpha=0.6)
+    for i in range(len(path)):
+        rec = Rectangle(path[i], 1, 1, color=c, alpha=0.4)
+        ax.add_patch(rec)
+
     return ax

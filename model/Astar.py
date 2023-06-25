@@ -154,10 +154,31 @@ class AStar:
         # print(list(abs(x - y) for x, y in zip(p_coord, end)))
         return k >= self.min_dis_bend
 
+    def is_enough_space(self, p):
+        p_coord = p.coord
+        prev_p_coord = p.parent.coord
+        m = 0
+        for k in range(self.dim):
+            if prev_p_coord[k] != p_coord[k]:
+                m = k
+                break
+        shift = [self.diameter] * self.dim
+        shift[m] = 0
+        p1 = tuple_operations(p_coord, tuple(shift), '-')
+        p2 = tuple_operations(p_coord, tuple(shift), '+')
+        for item in list(product(*(range(s, e+1) for s, e in zip(p1, p2)))):
+            if not self.is_valid_point(item):
+                return False
+
+        return True
+
     def process_point(self, curr_p):
         curr_p_coord = curr_p.coord
         if curr_p.n_cp == curr_p.parent.n_cp + 1 and not self.is_feasible_bend_point(curr_p):
             return None  # district the minimum distance between two bend point
+
+        if not self.is_enough_space(curr_p):
+            return None  # there is enough space for pipes with diameter > grid size
 
         p_cost = self.total_cost(curr_p)
         if not self.is_in_open_set(curr_p_coord):
@@ -183,7 +204,7 @@ class AStar:
             p = p.parent
         return path, bend_point
         
-    def run(self, start_nodes, end_nodes, diameter=1):
+    def run(self, start_nodes, end_nodes, diameter=3):
         start_time = time.time()
         if isinstance(start_nodes, tuple):
             start_nodes = [start_nodes]

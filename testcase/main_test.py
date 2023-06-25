@@ -11,17 +11,18 @@ from model.Pipe import Pipe
 from plotting import cuboid, trace, dim3plot
 from itertools import product
 import matplotlib.animation as anime
-from utils.functions import tuple_operations
+from utils.functions import *
 color_list = ["#DE47AB", "#72BE97", "#F7F797", "#7C749B", "#E85726"]
 
 
 class test_case(unittest.TestCase):
-    def test_dim2_with_obstacle(self):
+    def _test_dim2_with_obstacle(self):
         space_coords = ((0, 0), (20, 20))  # coords
         obstacle_coord = [[(4, 6), (8, 12)], [(10, 4), (14, 16)]]
         start_nodes = [(0, 3), (0, 0)]
         end_nodes = [(14, 17), (14, 15)]  # grip id
-        n_pipe = len(start_nodes)
+        diameter = 1
+        n_pipe = 1
         gif = False
         model = AStar(space_coords, w_path=1, w_bend=1, w_energy=1, max_energy=20, min_dis_bend=2, gif=gif)
         energy_value_obstacle = np.arange(3, 7)
@@ -56,7 +57,7 @@ class test_case(unittest.TestCase):
         bend_points = []
         for pipe_i in range(n_pipe):
             print(f"Processing pipe: {pipe_i}")
-            (path, bend_point), info = model.run(start_nodes[pipe_i], end_nodes[pipe_i])
+            (path, bend_point), info = model.run(start_nodes[pipe_i], end_nodes[pipe_i], diameter=diameter)
             if pipe_i < n_pipe - 1:
                 model.free_grid[tuple(zip(*path))] = 0
                 for factor in range(1, len(energy_value_path), 1):
@@ -100,20 +101,18 @@ class test_case(unittest.TestCase):
 
         # show the searched path
         for j in range(n_pipe):
-            trace.plot_trace2(path=paths[j], bend_points=bend_points[j], ax=ax, c=color_list[j], diameter=1)
+            trace.plot_trace2(path=paths[j], bend_points=bend_points[j], ax=ax, c=color_list[j], diameter=diameter)
         # energy = model.energy
         # for xx, yy in product(range(energy.shape[0]), range(energy.shape[1])):
         #     ax.text(xx+0.1, yy+0.3, f"{energy[xx, yy]:.1f}", size=10, color="black")
         fig.savefig("trace.png")
         plt.close(fig)
 
-    def _test_dim2_with_obstacle_global_optimization(self):
-        space_coords = ((0, 0), (20, 20))  # coords
-        obstacle_coord = [[(4, 6), (8, 12)], [(10, 4), (14, 16)]]
-        space_coords = ((0, 0), (20, 20))  # coords
-        obstacle_coord = [[(4, 6), (8, 12)], [(10, 4), (14, 16)]]
-        start_nodes = [(0, 3), (0, 0), (5, 0)]
-        end_nodes = [(14, 17), (14, 15), (16, 16)]  # grip id
+    def test_dim2_with_obstacle_global_optimization(self):
+        space_coords = ((0, 0), (50, 50))  # coords
+        obstacle_coord = [[(10, 0), (28, 32)], [(20, 34), (44, 46)]]
+        start_nodes = [(2, 3), (5, 0), (8, 6)]
+        end_nodes = [(44, 30), (47, 25), (49, 27)]  # grip id
         n_pipe = len(start_nodes)
         gif = False
         model = AStar(space_coords, w_path=1, w_bend=1, w_energy=1, max_energy=20, min_dis_bend=2, gif=gif)
@@ -145,14 +144,35 @@ class test_case(unittest.TestCase):
         # run model
         model.explore_obstacle(obstacle_coord)
         model.set_energy(obstacle_coord, values=energy_value_obstacle, distance=len(energy_value_obstacle))
-        paths = []
-        (path_common, _), info = model.run(start_nodes, end_nodes)
+        (path_common, bend_points_common), info = model.run(start_nodes, end_nodes, diameter=1)
 
+        for i in range(len(bend_points_common) - 1):
+            s, e = np.array(bend_points_common[i])+0.5, np.array(bend_points_common[i+1])+0.5
+            ax.plot(*zip(s, e), color=color_list[1], lw=2., alpha=0.6)
+
+        paths = []
+        bend_points_all = []
+        bend_points_all.append(get_parallel_line(bend_points_common, 'outer'))
+        bend_points_all.append(bend_points_common)
+        bend_points_all.append(get_parallel_line(bend_points_common, 'inner'))
+        for bend_points in bend_points_all:
+            path = generate_path_from_bend_points(bend_points)
+            paths.append(path)
+        print(bend_points_all[0])
+        print(bend_points_all[1])
+        print(bend_points_all[2])
+
+        paths_out = []
         for i_pipe in range(n_pipe):
+            print(f"Processing pipe: {i_pipe}")
+            model.reinit()
             start_node = start_nodes[i_pipe]
+            (path_start, _), info = model.run(start_node, paths[i_pipe], diameter=0)
+            model.reinit()
             end_node = end_nodes[i_pipe]
-            (path_start, bend_points), info = model.run(start_node, path_common)
-            (path_end, bend_points), info = model.run(end_node, path_common)
+            (path_end, _), info = model.run(end_node, paths[i_pipe], diameter=0)
+            path_cross = find_crossing_path(path_start, paths[i_pipe], path_end[::-1])
+            paths_out.append(path_cross)
 
         # plot gif, showing the searching process
         if gif:
@@ -182,9 +202,10 @@ class test_case(unittest.TestCase):
                     writer.grab_frame()
                     axes.cla()
 
-        # show the searched path
-        for j in range(n_pipe):
-            trace.plot_trace2(path=paths[j], bend_points=bend_points[j], ax=ax, c=color_list[j], diameter=1)
+        # # show the searched path
+        for i_pipe in range(n_pipe):
+            print(f"Plotting pipe: {i_pipe}")
+            trace.plot_trace2(path=paths_out[i_pipe], ax=ax, c=color_list[i_pipe])
         # energy = model.energy
         # for xx, yy in product(range(energy.shape[0]), range(energy.shape[1])):
         #     ax.text(xx+0.1, yy+0.3, f"{energy[xx, yy]:.1f}", size=10, color="black")

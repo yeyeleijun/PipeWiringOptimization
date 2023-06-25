@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2023/6/7 14:53
 # @Author  : Leijun Ye
+import numpy as np
 
 def tuple_operations(t1, t2, operator):
     """
@@ -90,25 +91,29 @@ def manhattan_distance(t1: tuple, t2: tuple):
 
 
 def get_parallel_line(bend_points, direction_str):
-    if direction_str == "right_down":
-        direction = (1, -1)
-    elif direction_str == "left_up":
-        direction = (-1, 1)
+    if direction_str == "outer":
+        factor = 1
+    elif direction_str == "inner":
+        factor = -1
     else:
         raise ValueError("Invalid directions!")
     bend_points_new = []
     if bend_points[0][0] == bend_points[1][0]:  # x不变，与y轴平行
-        bend_points_new.append((bend_points[0][0] + direction[0], bend_points[0][1]))
-    else:
-        bend_points_new.append((bend_points[0][0], bend_points[0][1] + direction[1]))
+        bend_points_new.append((bend_points[0][0] - factor, bend_points[0][1]))
+    else:  # 与x轴平行
+        bend_points_new.append((bend_points[0][0], bend_points[0][1] + factor))
 
     for i in range(1, len(bend_points) - 1):
-        bend_points_new.append(tuple_operations(bend_points[i], direction, '+'))
+        prev_p = bend_points[i - 1]
+        curr_p = bend_points[i]
+        post_p = bend_points[i + 1]
+        direction = np.sign(tuple_operations(curr_p, prev_p, '-')) + np.sign(tuple_operations(curr_p, post_p, '-'))
+        bend_points_new.append(tuple_operations(curr_p, tuple(direction * factor), '+'))
 
     if bend_points[-1][0] == bend_points[-2][0]:  # x不变，与y轴平行
-        bend_points_new.append((bend_points[-1][0] + direction[0], bend_points[-1][1]))
+        bend_points_new.append((bend_points[-1][0] - factor, bend_points[-1][1]))
     else:
-        bend_points_new.append((bend_points[-1][0], bend_points[-1][1] + direction[1]))
+        bend_points_new.append((bend_points[-1][0], bend_points[-1][1] + factor))
     return bend_points_new
 
 
@@ -140,3 +145,17 @@ def generate_path_from_bend_points(bend_points):
 
     # Return the path
     return path
+
+
+def find_crossing_path(path1, path2, path3):
+    # Find intersection point
+    intersection1 = (set(path1) & set(path2)).pop()
+    intersection2 = (set(path2) & set(path3)).pop()
+
+    # Build new path by combining segments
+    new_path = []
+    new_path.extend(path1[:path1.index(intersection1)])
+    new_path.extend(path2[path2.index(intersection1):path2.index(intersection2)])
+    new_path.extend(path3[path3.index(intersection2):])
+
+    return new_path
