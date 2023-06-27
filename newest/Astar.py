@@ -2,7 +2,7 @@ from queue import PriorityQueue
 import time
 import math
 from itertools import product
-from utils.functions import tuple_operations, generate_rectangle_vertices, manhattan_distance
+from utils.functions import tuple_operations, manhattan_distance
 
 
 def time_it(func):
@@ -58,7 +58,7 @@ class AStar:
     @staticmethod
     def coord_valid(coord, coord_lb, coord_rt):
         for x, x_small, x_big in zip(coord, coord_lb, coord_rt):
-            if x_small <= x < x_big:
+            if x_small <= x <= x_big:
                 continue
             else:
                 return False
@@ -72,7 +72,7 @@ class AStar:
         return res
 
     def __init__(self, space_coords: tuple, obstacle_coords: list, w_path: float, w_bend: float, w_energy: float,
-                 min_dis_bend: int):
+                 min_dis_bend: int, gif=False):
         """
         :param space_coords: the diagonal coords of the valid cuboid in an incremental order.
                             for example: ((0, 0), (100, 100), one must be (0, 0, 0).
@@ -90,6 +90,7 @@ class AStar:
         self.w_bend = w_bend
         self.w_energy = w_energy
         self.min_dis_bend = min_dis_bend
+        self.gif = gif
 
     def init_property(self, compensate=0):
         num_obstacles = len(self.obstacle_coords)
@@ -125,9 +126,14 @@ class AStar:
                             continue
                     if is_valid:
                         phy_vertex.append((i, j))
-        self.open_set = dict(zip(phy_vertex, [1] * len(phy_vertex)))
+        self.phy_vertex = phy_vertex
+        self.open_set = dict(zip(phy_vertex, [0] * len(phy_vertex)))
         self.close_set = dict(zip(phy_vertex, [0] * len(phy_vertex)))
-        # self.pq.queue.clear()
+
+    def reinit(self):
+        self.open_set = dict(zip(self.phy_vertex, [0] * len(self.phy_vertex)))
+        self.close_set = dict(zip(self.phy_vertex, [0] * len(self.phy_vertex)))
+        self.pq.queue.clear()
 
     def init_edge_cost(self, edge_cost=1.):
         if self.dim == 3:
@@ -156,7 +162,7 @@ class AStar:
         return self.base_cost(p) + self.heuristic_cost(p.coord, end)
 
     def is_in_open_set(self, p_coord: tuple):
-        if p_coord in self.open_set and self.open_set[p_coord] == 1:
+        if self.open_set[p_coord] == 0:
             return True
         return False
 
@@ -192,7 +198,7 @@ class AStar:
     def process_point(self, curr_p, end_info):
         curr_p_coord = curr_p.coord
         if curr_p.n_cp == curr_p.parent.n_cp + 1:
-            if self.is_feasible_bend_point(curr_p) or self.cmp(curr_p.coord, end_info[0]) and curr_p.direction == end_info[1] or curr_p.depth == 2:
+            if self.is_feasible_bend_point(curr_p):  # or (self.cmp(curr_p.coord, end_info[0]) and curr_p.direction == end_info[1]) or curr_p.depth == 2
                 pass
             else:
                 return None  # district the minimum distance between two bend point
@@ -221,6 +227,8 @@ class AStar:
                     bend_path.insert(0, p.parent.coord_info)
                 p = p.parent
         bend_path.insert(0, self.start.coord_info)
+        if self.cmp(bend_path[0][0], bend_path[1][0]):
+            bend_path.pop(0)
         path.insert(0, self.start.coord_info)
         return bend_path, path
 
@@ -231,12 +239,13 @@ class AStar:
         self.start = Node(start_info, edge_cost=0.)
         self.pq.put((0, self.start))
 
+        detailed_info = []
         while not self.pq.empty():
             # find the node with minimum cost
             curr_p = self.pq.get()[1]
             # print(f'Process Point: {curr_p.coord}')
             if self.cmp(curr_p.coord, end_info[0]) and curr_p.direction == end_info[1]:  # exit if finding the end point
-                return self.build_path(curr_p)
+                return self.build_path(curr_p), detailed_info
             self.close_set[curr_p.coord] = 1
             self.open_set[curr_p.coord] = 0
 
@@ -247,20 +256,50 @@ class AStar:
                     continue  # Do nothing for invalid point
                 if self.is_in_close_set(curr_p_coord):
                     continue  # Do nothing for visited point
-                if not self.is_enough_space(curr_p_coord, direction[1], radius, delta):
-                    continue  # there is enough space for pipes with radius > grid size
+                # if not self.is_enough_space(curr_p_coord, direction[1], radius, delta):
+                #     continue  # there is enough space for pipes with radius > grid size
                 edge_cost = self.edge_cost[(curr_p_coord, direction[1])]
                 curr_p = Node((curr_p_coord, direction[1]), parent=pre_p, edge_cost=edge_cost)
                 self.process_point(curr_p, end_info=end_info)
+            if self.gif:
+                detailed_info.append((self.open_set.copy(), pre_p.coord))
 
 
 if __name__ == '__main__':
-    space_coords = ((0, 0, 0), (6, 6, 6))  # coords
-    obstacle_coord = [[(1, 1, 0), (2.5, 2.5, 3.2)]]
-    pipes = (((0, 0, 2), "+x"), ((5, 5, 4), "+z"), 0, 0)
+    import matplotlib.pyplot as plt
+    import matplotlib.animation as anime
+    from plotting import cuboid
+    space_coords = ((0, 0), (10, 10))  # coords
+    obstacle_coord = [[(3, 3), (6, 6)]]
+    pipes = (((0, 3), "+x"), ((8, 10), "+y"), 0, 0)
     n_pipe = 1
     model = AStar(space_coords, obstacle_coord, w_path=1., w_bend=1., w_energy=1., min_dis_bend=2)
-    bend_path, path = model.run(pipes[0], pipes[1], pipes[2], pipes[3])
+    (bend_path, path), info = model.run(pipes[0], pipes[1], pipes[2], pipes[3])
     print(bend_path)
     print("-----\n")
     print(path)
+    fig_gif = plt.figure(figsize=(5, 5))
+    axes = fig_gif.gca()
+    metadata = dict(title="Movie", artist="sourabh")
+    writer = anime.PillowWriter(fps=1, metadata=metadata)
+    with writer.saving(fig_gif, "Astar.gif", 100):
+        for i in range(len(info)):
+            point = info[i][-1]
+            open_map = info[i][0]
+            cuboid.structure_cuboid(space_coords[0], space_coords[1], ax=axes)
+            for k in range(len(obstacle_coord)):
+                cuboid.shadow_cuboid(obstacle_coord[k][0], obstacle_coord[k][1], ax=axes)
+            axes.scatter(*point, marker="o", c="red", alpha=1., s=50)
+            nonzero_coords = [value[0] for value in open_map.items() if value[1] > 0]
+            for x_ind, y_ind in nonzero_coords:
+                axes.text(x_ind-0.2, y_ind + 0.1, f"{open_map[x_ind, y_ind]:.1f}", size=10, color="black")
+            axes.set_xlim([space_coords[0][0], space_coords[1][0]])
+            axes.set_ylim([space_coords[0][1], space_coords[1][1]])
+            axes.set_xticks(range(space_coords[0][0], space_coords[1][0], 1))
+            axes.set_yticks(range(space_coords[0][1], space_coords[1][1], 1))
+            axes.grid(True)
+            axes.set_xlabel("x", fontsize=30)
+            axes.set_ylabel("y", fontsize=30)
+            writer.grab_frame()
+            axes.cla()
+
