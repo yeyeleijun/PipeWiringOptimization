@@ -34,7 +34,7 @@ class Node:
             self.energy = self.parent.energy + energy
             if self.parent.direction != self.direction:
                 self.n_cp = self.parent.n_cp + 1
-                self.depth = self.parent.depth
+                self.depth = self.parent.depth + 1
             else:
                 self.n_cp = self.parent.n_cp
                 self.depth = self.parent.depth + 1
@@ -125,7 +125,7 @@ class AStar:
                             continue
                     if is_valid:
                         phy_vertex.append((i, j))
-        self.open_set = dict(zip(phy_vertex, [0] * len(phy_vertex)))
+        self.open_set = dict(zip(phy_vertex, [1] * len(phy_vertex)))
         self.close_set = dict(zip(phy_vertex, [0] * len(phy_vertex)))
         # self.pq.queue.clear()
 
@@ -156,7 +156,7 @@ class AStar:
         return self.base_cost(p) + self.heuristic_cost(p.coord, end)
 
     def is_in_open_set(self, p_coord: tuple):
-        if self.open_set[p_coord] > 0:
+        if p_coord in self.open_set and self.open_set[p_coord] == 1:
             return True
         return False
 
@@ -174,6 +174,21 @@ class AStar:
         # print(list(abs(x - y) for x, y in zip(p_coord, end)))
         return k >= self.min_dis_bend
 
+    def is_enough_space(self, p_coord, direction, radius, delta):
+        shift = [radius + delta] * self.dim
+        if direction in ['+x', '-x']:
+            shift[0] = 0
+        elif direction in ['+y', '-y']:
+            shift[1] = 0
+        else:
+            shift[2] = 0
+        p1 = tuple_operations(p_coord, tuple(shift), '-')
+        p2 = tuple_operations(p_coord, tuple(shift), '+')
+        for item in list(product(*(range(s, e+1) for s, e in zip(p1, p2)))):
+            if not self.is_in_open_set(item):
+                return False
+        return True
+
     def process_point(self, curr_p, end_info):
         curr_p_coord = curr_p.coord
         if curr_p.n_cp == curr_p.parent.n_cp + 1:
@@ -183,7 +198,7 @@ class AStar:
                 return None  # district the minimum distance between two bend point
 
         p_cost = self.total_cost(curr_p, end_info[0])
-        if not self.is_in_open_set(curr_p_coord):
+        if self.is_in_open_set(curr_p_coord):
             self.open_set[curr_p_coord] = p_cost
             self.pq.put((p_cost, curr_p))
         elif p_cost < self.open_set[curr_p_coord]:  # update minimum cost and node
@@ -193,24 +208,10 @@ class AStar:
         else:
             pass
 
-    def get_covering_list(self, path, radius=1, delta_k=0):
-        Pk = path[:]
-        Lk = path[:]  # Initialize Lk as the same as Pk
-
-        for v0 in Pk:
-            for v in Lk:
-                for direction in self.directions:
-                    v_prime = tuple_operations(v, direction, '+')  # Get adjacent vertices of v
-                    if self.is_valid_point(v_prime) and self.get_max_distance(v0,
-                                                                              v_prime) <= radius + delta_k and v_prime not in Lk:
-                        Lk.append(v_prime)
-        return Lk
-
     def build_path(self, p):
         bend_path = []
         path = []
         bend_path.insert(0, p.coord_info)  # Insert first
-        path.insert(0, p.coord_info)  # Insert first
         while True:
             if self.cmp(p.coord, self.start.coord):
                 break
@@ -224,8 +225,8 @@ class AStar:
         return bend_path, path
 
     @time_it
-    def run(self, start_info, end_info):
-        # for example start_info: ((5, 7, 0), "x"); end_info: ((0, 99, 77), "y");
+    def run(self, start_info, end_info, radius, delta):
+        # for example start_info: ((5, 7, 0), "+x"); end_info: ((0, 99, 77), "+y");
 
         self.start = Node(start_info, edge_cost=0.)
         self.pq.put((0, self.start))
@@ -246,6 +247,8 @@ class AStar:
                     continue  # Do nothing for invalid point
                 if self.is_in_close_set(curr_p_coord):
                     continue  # Do nothing for visited point
+                if not self.is_enough_space(curr_p_coord, direction[1], radius, delta):
+                    continue  # there is enough space for pipes with radius > grid size
                 edge_cost = self.edge_cost[(curr_p_coord, direction[1])]
                 curr_p = Node((curr_p_coord, direction[1]), parent=pre_p, edge_cost=edge_cost)
                 self.process_point(curr_p, end_info=end_info)
@@ -254,11 +257,10 @@ class AStar:
 if __name__ == '__main__':
     space_coords = ((0, 0, 0), (6, 6, 6))  # coords
     obstacle_coord = [[(1, 1, 0), (2.5, 2.5, 3.2)]]
-    start = ((0, 0, 2), "+x")
-    end = ((5, 5, 4), "+z")
+    pipes = (((0, 0, 2), "+x"), ((5, 5, 4), "+z"), 0, 0)
     n_pipe = 1
     model = AStar(space_coords, obstacle_coord, w_path=1., w_bend=1., w_energy=1., min_dis_bend=2)
-    bend_path, path = model.run(start, end)
+    bend_path, path = model.run(pipes[0], pipes[1], pipes[2], pipes[3])
     print(bend_path)
     print("-----\n")
     print(path)
