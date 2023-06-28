@@ -162,7 +162,7 @@ class AStar:
         return self.base_cost(p) + self.heuristic_cost(p.coord, end)
 
     def is_in_open_set(self, p_coord: tuple):
-        if self.open_set[p_coord] == 0:
+        if p_coord in self.open_set and self.open_set[p_coord] == 0:
             return True
         return False
 
@@ -181,7 +181,7 @@ class AStar:
         return k >= self.min_dis_bend
 
     def is_enough_space(self, p_coord, direction, radius, delta):
-        shift = [radius + delta] * self.dim
+        shift = [math.ceil(radius + delta)] * self.dim
         if direction in ['+x', '-x']:
             shift[0] = 0
         elif direction in ['+y', '-y']:
@@ -191,7 +191,7 @@ class AStar:
         p1 = tuple_operations(p_coord, tuple(shift), '-')
         p2 = tuple_operations(p_coord, tuple(shift), '+')
         for item in list(product(*(range(s, e+1) for s, e in zip(p1, p2)))):
-            if not self.is_in_open_set(item):
+            if item not in self.open_set:
                 return False
         return True
 
@@ -244,7 +244,7 @@ class AStar:
             # find the node with minimum cost
             curr_p = self.pq.get()[1]
             # print(f'Process Point: {curr_p.coord}')
-            if self.cmp(curr_p.coord, end_info[0]) and curr_p.direction == end_info[1]:  # exit if finding the end point
+            if self.cmp(curr_p.coord, end_info[0]):  # exit if finding the end point
                 return self.build_path(curr_p), detailed_info
             self.close_set[curr_p.coord] = 1
             self.open_set[curr_p.coord] = 0
@@ -256,8 +256,8 @@ class AStar:
                     continue  # Do nothing for invalid point
                 if self.is_in_close_set(curr_p_coord):
                     continue  # Do nothing for visited point
-                # if not self.is_enough_space(curr_p_coord, direction[1], radius, delta):
-                #     continue  # there is enough space for pipes with radius > grid size
+                if not self.is_enough_space(curr_p_coord, direction[1], radius, delta):
+                    continue  # there is enough space for pipes with radius > grid size
                 edge_cost = self.edge_cost[(curr_p_coord, direction[1])]
                 curr_p = Node((curr_p_coord, direction[1]), parent=pre_p, edge_cost=edge_cost)
                 self.process_point(curr_p, end_info=end_info)
@@ -271,9 +271,9 @@ if __name__ == '__main__':
     from plotting import cuboid
     space_coords = ((0, 0), (10, 10))  # coords
     obstacle_coord = [[(3, 3), (6, 6)]]
-    pipes = (((0, 3), "+x"), ((8, 10), "+y"), 0, 0)
+    pipes = (((0, 3), "+x"), ((8, 10), "+y"), 1, 0)
     n_pipe = 1
-    model = AStar(space_coords, obstacle_coord, w_path=1., w_bend=1., w_energy=1., min_dis_bend=2)
+    model = AStar(space_coords, obstacle_coord, w_path=1., w_bend=1., w_energy=1., min_dis_bend=0, gif=True)
     (bend_path, path), info = model.run(pipes[0], pipes[1], pipes[2], pipes[3])
     print(bend_path)
     print("-----\n")

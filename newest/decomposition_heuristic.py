@@ -6,7 +6,8 @@
 from Astar import AStar
 from utils.functions import tuple_operations
 from itertools import product
-
+from dim3_plot import *
+import numpy as np
 
 class decomposition_heuristic(AStar):
     def __init__(self, maxit, space_coords, obstacle_coords, pipes, w_path, w_bend, w_energy, min_dis_bend):
@@ -49,7 +50,7 @@ class decomposition_heuristic(AStar):
 
     def update_cost(self, edges: list, change_cost):
         for edge in edges:
-            self.edge_cost[edge] = change_cost
+            self.edge_cost[edge] += change_cost
 
     def cmp_priority(self, pipe_i, pipe_j):   # the pipe with larger radius has higher priority
         return pipe_i[2] + pipe_i[3] > pipe_j[2] + pipe_j[3]
@@ -61,73 +62,110 @@ class decomposition_heuristic(AStar):
         Kbar = self.K0[:]
         covering_list_n = [[] for _ in range(self.n_pipes)]
         path_n = [[] for _ in range(self.n_pipes)]
-        while stop == 0 and it <= self.maxit:
+        bend_points_n = [[] for _ in range(self.n_pipes)]
+        while stop == 0 and it < self.maxit:
             if self.index_category[it] == 'I_seq':
                 Kit = self.K0[:]
                 Kbar = self.K0[:]
 
             for pipe_k in Kit:
                 k = self.get_pipe_index(pipe_k)
-                print(f"processing: {k}")
-                (_, path_k), _ = self.run(pipe_k[0], pipe_k[1], radius=pipe_k[2], delta=pipe_k[3])
+                # print(f"processing: {k}")
+                (bend_points_k, path_k), _ = self.run(pipe_k[0], pipe_k[1], radius=pipe_k[2], delta=pipe_k[3])
                 self.reinit()
-                print(f"path: {path_k}")
+                # print(f"path: {path_k}")
                 path_n[k] = path_k
+                bend_points_n[k] = bend_points_k
                 covering_list_n[k] = self.get_covering_list(path_k, radius=pipe_k[2], delta=pipe_k[3])
                 if self.index_category[it] == 'I_seq':
                     Kbar.remove(pipe_k)
-                    self.update_cost(covering_list_n[k], change_cost=0)
+                    self.update_cost(covering_list_n[k], change_cost=2)
+            if it == 0:
+                bend_points_n_init = bend_points_n
 
-            cov_conflict = [[[] for _ in range(self.n_pipes)] for _ in range(len(Kit))]
+            cov_conflict = [[[] for _ in range(self.n_pipes)] for _ in range(self.n_pipes)]
             for pipe_k in Kit:
                 k = self.get_pipe_index(pipe_k)
                 for pipe_k_prime in self.K0:
                     k_prime = self.get_pipe_index(pipe_k_prime)
                     if k != k_prime:
                         cov_conflict[k][k_prime] = list(set(covering_list_n[k]) & set(covering_list_n[k_prime]))
-            print(cov_conflict)
+            cov_conflict_num = np.zeros((self.n_pipes, self.n_pipes))
+            for i in range(self.n_pipes):
+                for j in range(self.n_pipes):
+                    cov_conflict_num[i, j] = len(cov_conflict[i][j])
+            print(f"cov_conflict_num: {cov_conflict_num}")
 
             if not self.is_empty_list(cov_conflict):
                 stop = 0
                 if self.index_category[it] == 'I_par':
+                    cov_conflict_set = set()
                     for k in range(len(cov_conflict)):
-                        print(f"conflict: {cov_conflict[k]}")
-                        cov_conflict_set = set([item for item in cov_conflict[k]])
-                        self.update_cost(list(cov_conflict_set), change_cost=0)
+                        for items in cov_conflict[k]:
+                            for item in items:
+                                cov_conflict_set.add(item)
+                        self.update_cost(list(cov_conflict_set), change_cost=5)
                 if self.index_category[it] == 'I_cluster':
                     Kit_next = set()
-                    for i, pipe_i in enumerate(Kit):
-                        for j, pipe_j in enumerate(self.K0):
+                    for pipe_i in Kit:
+                        i = self.get_pipe_index(pipe_i)
+                        for pipe_j in self.K0:
+                            j = self.get_pipe_index(pipe_j)
                             if cov_conflict[i][j]:
                                 if self.cmp_priority(pipe_i, pipe_j):
                                     Kit_next.add(pipe_j)
                                 else:
                                     Kit_next.add(pipe_i)
 
-                    temp = set()
+                    conflict_edges = set()
                     for pipe_k in Kit_next:
                         k = self.get_pipe_index(pipe_k)
                         for pipe_k_prime in self.K0:
                             k_prime = self.get_pipe_index(pipe_k_prime)
-                            if k != k_prime:
-                                temp.add(cov_conflict[k][k_prime])
-                    self.update_cost(temp, change_cost=0)
+                            if pipe_k_prime not in Kit_next and cov_conflict[k][k_prime]:
+                                for item in cov_conflict[k][k_prime]:
+                                    conflict_edges.add(item)
+                    self.update_cost(list(conflict_edges), change_cost=10)
                     Kit = list(Kit_next)
                 it += 1
             else:
                 stop = 1
-        return path_n
+        return path_n, bend_points_n_init, bend_points_n
 
 
 if __name__ == '__main__':
-    space_coords = ((0, 0, 0), (12, 12, 12))  # coords
-    obstacle_coord = []
-    # obstacle_coord = [[(1, 1, 0), (2.5, 2.5, 3.2)]]
-    pipes = [(((0, 0, 2), "+x"), ((5, 5, 12), "+x"), 0, 0), (((0, 2, 0), "+y"), ((12, 5, 4), "+z"), 0, 0)]
+    space_coords = ((0, 0, 0), (33, 33, 33))  # coords
+    # obstacle_coord = []
+    obstacle_coord = [[(10, 10, 10), (20, 20, 20)]]
+    pipes = [(((2, 2, 3), "+y"), ((33, 12, 12), "+x"), 2, 0), (((0, 2, 3), "+y"), ((12, 33, 8), "+z"), 1, 0)]
     maxit = 10
-    model = decomposition_heuristic(maxit, space_coords, obstacle_coord, pipes, w_path=1., w_bend=1., w_energy=1., min_dis_bend=0)
-    paths = model.main_run()
+    model = decomposition_heuristic(maxit, space_coords, obstacle_coord, pipes, w_path=1., w_bend=3., w_energy=1.,
+                                    min_dis_bend=0)
+    paths, bend_points_init, bend_points = model.main_run()
+
+    """plot the initial path"""
+    print(bend_points_init)
+    fig = mlab.figure(figure=1, size=(400, 400))
+    structure_cuboid(*space_coords, name="space")
+    for k in range(len(obstacle_coord)):
+        surface_cuboid(*obstacle_coord[k], name=f"obstacle{k}")
+    # surface_cuboid((20, 40, 50), (80, 60, 70), name="obstacle2")
+    for k in range(len(pipes)):
+        trace_plot(bend_points_init[k], radius_ratio=pipes[k][2]/12, name="trace")
+    mlab.show()
+
+    """plot the path after solving conflict"""
+    print("Done!")
     print(paths)
+    print(bend_points)
+    fig = mlab.figure(figure=1, size=(400, 400))
+    structure_cuboid(*space_coords, name="space")
+    for k in range(len(obstacle_coord)):
+        surface_cuboid(*obstacle_coord[k], name=f"obstacle{k}")
+    # surface_cuboid((20, 40, 50), (80, 60, 70), name="obstacle2")
+    for k in range(len(pipes)):
+        trace_plot(bend_points[k], name="trace")
+    mlab.show()
 
 
 
