@@ -241,6 +241,7 @@ class AStar:
 
         detailed_info = []
         while not self.pq.empty():
+            # print(len(self.pq))
             # find the node with minimum cost
             curr_p = self.pq.get()[1]
             # print(f'Process Point: {curr_p.coord}')
@@ -256,8 +257,8 @@ class AStar:
                     continue  # Do nothing for invalid point
                 if self.is_in_close_set(curr_p_coord):
                     continue  # Do nothing for visited point
-                if not self.is_enough_space(curr_p_coord, direction[1], radius, delta):
-                    continue  # there is enough space for pipes with radius > grid size
+                # if not self.is_enough_space(curr_p_coord, direction[1], radius, delta):
+                #     continue  # there is enough space for pipes with radius > grid size
                 edge_cost = self.edge_cost[(curr_p_coord, direction[1])]
                 curr_p = Node((curr_p_coord, direction[1]), parent=pre_p, edge_cost=edge_cost)
                 self.process_point(curr_p, end_info=end_info)

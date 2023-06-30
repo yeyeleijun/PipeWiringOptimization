@@ -1,17 +1,8 @@
 import os
-
+from itertools import product
 os.environ['ETS_TOOLKIT'] = 'qt4'
 import numpy as np
 from mayavi import mlab
-
-count = 0
-colors = [
-    (0.0, 0.8, 0.8),
-    (0.8, 0.8, 0.0),
-    (0.0, 0.8, 0.8),
-    (0.0, 0.0, 0.8),
-]
-
 
 def surface_cuboid(coord1: tuple, coord2: tuple, name="obstacle1"):
     l = abs(coord2[0] - coord1[0])
@@ -66,15 +57,17 @@ def structure_cuboid(coord1, coord2, name="space"):
              vertices[face[0]][2]]
         mlab.plot3d(x, y, z, tube_radius=None, opacity=0.7)
     mlab.axes(extent=[x1, x2, y1, y2, z1, z2], name=name)
+    x, y, z = zip(*product(range(coord1[0], coord2[0] + 1), range(coord1[1], coord2[1] + 1), range(coord1[2], coord2[2] + 1)))
+    mlab.points3d(x, y, z, scale_factor=.25)
 
 
-def trace_plot(path, radius_ratio=0.05, name="trace"):
-    global count
+def trace_plot(path, radius_ratio=0.05, color=(0, 0, 0), name="trace"):
     xx = [item[0][0] for item in path]
     yy = [item[0][1] for item in path]
     zz = [item[0][2] for item in path]
-    mlab.plot3d(xx, yy, zz, tube_radius=radius_ratio, color=colors[count], opacity=0.8, name=name)
-    count += 1
+    tube = mlab.pipeline.tube(mlab.pipeline.line_source(xx, yy, zz), tube_radius=radius_ratio, name=name)
+    mlab.pipeline.surface(tube, color=color)
+    # mlab.plot3d(xx, yy, zz, tube_radius=radius_ratio, tube_sides=15, color=color, opacity=0.8, name=name)
     return None
 
 
