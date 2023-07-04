@@ -1,10 +1,49 @@
-import numpy as np
 from queue import PriorityQueue
-from model.Point import Node
 import time
-from itertools import product
 import math
-from utils.functions import tuple_operations, generate_rectangle_vertices, manhattan_distance
+from itertools import product
+from utils.functions import tuple_operations, manhattan_distance
+
+
+def time_it(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
+        print(f"{func.__name__} cost time：{end - start} s")
+        return result
+
+    return wrapper
+
+
+class Node:
+    def __init__(self, coord_info, parent=None, edge_cost=0.):
+        self.coord_info = coord_info
+        self.coord = coord_info[0]
+        self.parent = parent
+        self.direction = coord_info[1]  # "x", "y", "z"
+
+        if self.parent is None:
+            self.depth = 1
+            self.n_cp = 0
+            self.edge_cost = edge_cost
+            self.energy = 1 if coord_info[1][1:] == "z" else 0
+        else:
+            self.edge_cost = self.parent.edge_cost + edge_cost
+            energy = 1 if coord_info[1][1:] == "z" else 0
+            self.energy = self.parent.energy + energy
+            if self.parent.direction != self.direction:
+                self.n_cp = self.parent.n_cp + 1
+                self.depth = self.parent.depth + 1
+            else:
+                self.n_cp = self.parent.n_cp
+                self.depth = self.parent.depth + 1
+
+    def __lt__(self, other):
+        return self.coord[0] < other.coord[0]
+
+    def __eq__(self, other):
+        return self.coord == other.coord
 
 
 class AStar:
@@ -19,124 +58,111 @@ class AStar:
     @staticmethod
     def coord_valid(coord, coord_lb, coord_rt):
         for x, x_small, x_big in zip(coord, coord_lb, coord_rt):
-            if x_small <= x < x_big:
+            if x_small <= x <= x_big:
                 continue
             else:
                 return False
         return True
 
-    def __init__(self, space_coords: tuple, w_path: float, w_bend: float, w_energy: float, max_energy: float, min_dis_bend: int, gif=False):
+    @staticmethod
+    def get_max_distance(p1: tuple, p2: tuple):
+        res = 0
+        for x, y in zip(p1, p2):
+            res = max(res, abs(x - y))
+        return res
+
+    def __init__(self, space_coords: tuple, obstacle_coords: list, w_path: float, w_bend: float, w_energy: float,
+                 min_dis_bend: int, gif=False):
         """
         :param space_coords: the diagonal coords of the valid cuboid in an incremental order.
                             for example: ((0, 0), (100, 100), one must be (0, 0, 0).
         :param start: the starting nozzle, example as (1, 1) grid.
         """
         self.space_coords = space_coords
-        self.grid_size = tuple(space_coords[1][i] - space_coords[0][i] for i in range(len(space_coords[0])))
         self.dim = len(space_coords[0])
-        self.open_set = np.zeros(self.grid_size, dtype=np.float16)
-        self.close_set = np.zeros(self.grid_size, dtype=np.float16)
-        self.dir_map = np.zeros(self.grid_size, dtype=np.float16)
+        self.obstacle_coords = obstacle_coords
+        self.init_property(compensate=0)
+        # self.grid_size = tuple(space_coords[1][i] - space_coords[0][i] for i in range(len(space_coords[0])))
+        self.init_edge_cost(edge_cost=1.)
         self.pq = PriorityQueue()
-        self.free_grid = np.ones(self.grid_size, dtype=np.uint8)  # 1 is valid
         self.set_directions()
-        self.energy = np.ones(self.grid_size, dtype=np.float16) * max_energy
         self.w_path = w_path
         self.w_bend = w_bend
         self.w_energy = w_energy
         self.min_dis_bend = min_dis_bend
         self.gif = gif
 
+    def init_property(self, compensate=0):
+        num_obstacles = len(self.obstacle_coords)
+        phy_vertex = []
+        if self.dim == 3:
+            for i in range(self.space_coords[0][0], self.space_coords[1][0] + 1):
+                for j in range(self.space_coords[0][1], self.space_coords[1][1] + 1):
+                    for k in range(self.space_coords[0][2], self.space_coords[1][2] + 1):
+                        is_valid = True
+                        for count in range(num_obstacles):
+                            coord0, coord1 = self.obstacle_coords[count]
+                            coord_lb = tuple(map(lambda item: math.floor(item) - compensate, coord0))
+                            coord_rt = tuple(map(lambda item: math.ceil(item) + compensate, coord1))
+                            if self.coord_valid((i, j, k), coord_lb, coord_rt):
+                                is_valid = False
+                                break
+                            else:
+                                continue
+                        if is_valid:
+                            phy_vertex.append((i, j, k))  # add vertex (i, j, k)
+        else:
+            for i in range(self.space_coords[0][0], self.space_coords[1][0] + 1):
+                for j in range(self.space_coords[0][1], self.space_coords[1][1] + 1):
+                    is_valid = True
+                    for count in range(num_obstacles):
+                        coord0, coord1 = self.obstacle_coords[count]
+                        coord_lb = tuple(map(lambda item: math.floor(item) - compensate, coord0))
+                        coord_rt = tuple(map(lambda item: math.ceil(item) + compensate, coord1))
+                        if self.coord_valid((i, j), coord_lb, coord_rt):
+                            is_valid = False
+                            break
+                        else:
+                            continue
+                    if is_valid:
+                        phy_vertex.append((i, j))
+        self.phy_vertex = phy_vertex
+        self.open_set = dict(zip(phy_vertex, [0] * len(phy_vertex)))
+        self.close_set = dict(zip(phy_vertex, [0] * len(phy_vertex)))
+
     def reinit(self):
-        self.open_set = np.zeros(self.grid_size, dtype=np.float16)
-        self.close_set = np.zeros(self.grid_size, dtype=np.float16)
-        self.dir_map = np.zeros(self.grid_size, dtype=np.float16)
+        self.open_set = dict(zip(self.phy_vertex, [0] * len(self.phy_vertex)))
+        self.close_set = dict(zip(self.phy_vertex, [0] * len(self.phy_vertex)))
         self.pq.queue.clear()
+
+    def init_edge_cost(self, edge_cost=1.):
+        if self.dim == 3:
+            edges = list(product(self.open_set, ["+x", "-x", "+y", "-y", "+z", "-z"]))
+        else:
+            edges = list(product(self.open_set, ["+x", "-x", "+y", "-y"]))
+        self.edge_cost = dict(zip(edges, [edge_cost] * len(edges)))
 
     def set_directions(self):
         if self.dim == 3:
-            self.directions = [(0, 1, 0), (0, -1, 0), (1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1)]
+            self.directions = [((0, 1, 0), "+y"), ((0, -1, 0), "-y"),
+                               ((1, 0, 0), "+x"), ((-1, 0, 0), "-x"),
+                               ((0, 0, 1), "+z"), ((0, 0, -1), "-z")]
         else:
-            self.directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
-
-    def explore_obstacle(self, obstacle_coords, tolerance=0):
-        """
-        :param obstacle_coords: list of all obstacles organized as tuples.
-        :param tolerance: the space should be extended outward by a certain distance, default is 0.
-        """
-        for i in range(len(obstacle_coords)):
-            coord0, coord1 = obstacle_coords[i]
-            coord0 = tuple(map(lambda item: math.floor(item) - tolerance, coord0))
-            coord1 = tuple(map(lambda item: math.ceil(item) + tolerance, coord1))
-            for coord in product(*(range(s, e) for s, e in zip(coord0, coord1))):
-                if self.coord_valid(coord, self.space_coords[0], self.space_coords[1]):
-                    self.free_grid[coord] = 0
-        return None
-
-    def set_energy(self, obstacle_coords, values, distance=3):
-
-        # set energy along the obstacle, extending 'distance' steps. [1, 2, 3] -> [5, 3, 1]
-        assert len(values) == distance
-        values = values[::-1]
-        for j, dis in enumerate(range(distance, 0, -1)):
-            for ind in range(len(obstacle_coords)):
-                for i in range(self.dim):
-                    coord0, coord1 = obstacle_coords[ind]
-                    coord0 = list(map(lambda item: math.floor(item) - dis, coord0))
-                    coord1 = list(map(lambda item: math.ceil(item) - 1 + dis, coord1))
-                    vertex_coord = generate_rectangle_vertices(coord0, coord1, dimension=self.dim)
-                    for diag_coord in vertex_coord:
-                        if self.coord_valid(diag_coord, self.space_coords[0], self.space_coords[1]):
-                            self.energy[tuple(diag_coord)] = values[j] * math.sqrt(2)
-                    fixed_coord0 = coord0.pop(i)
-                    fixed_coord1 = coord1.pop(i)
-                    coord0 = [x + 1 for x in coord0]
-                    for coord_new in product(*(range(s, e) for s, e in zip(coord0, coord1))):
-                        coord_new1 = list(coord_new)
-                        coord_new1.insert(i, fixed_coord0)
-                        if self.coord_valid(coord_new1, self.space_coords[0], self.space_coords[1]):
-                            self.energy[tuple(coord_new1)] = values[j]
-                        coord_new2 = list(coord_new)
-                        coord_new2.insert(i, fixed_coord1)
-                        if self.coord_valid(coord_new2, self.space_coords[0], self.space_coords[1]):
-                            self.energy[tuple(coord_new2)] = values[j]
-        # if self.dim == 2:
-        #     self.energy[0, :] = 1
-        #     self.energy[-1, :] = 1
-        #     self.energy[:, 0] = 1
-        #     self.energy[:, -1] = 1
-        # elif self.dim == 3:
-        #     # init the surface this 3d cuboid
-        #     self.energy[0, :, :] = 1
-        #     self.energy[-1, :, :] = 1
-        #     self.energy[:, 0, :] = 1
-        #     self.energy[:, -1, :] = 1
-        #     self.energy[:, :, 0] = 1
-        #     self.energy[:, :, -1] = 1
-        self.energy[np.where(self.free_grid == 0)] = float('inf')
-        return None
+            self.directions = [((0, 1), "+y"), ((0, -1), "-y"), ((1, 0), "+x"), ((-1, 0), "-x")]
 
     def base_cost(self, p):
-        f = self.w_path * p.depth + self.w_bend * p.n_cp + self.w_energy * p.energy
+        f = self.w_path * p.edge_cost + self.w_bend * p.n_cp + self.w_energy * p.energy
         return f
 
     def heuristic_cost(self, p_coord, end):
         # Manhattan distance between current point and end point
         return manhattan_distance(p_coord, end)
 
-    def total_cost(self, p):
-        # print(p.coord, self.energy[p.coord], self.base_cost(p), self.heuristic_cost(p.coord, end))
-        # print(list(map(lambda x: self.heuristic_cost(p.coord, x), self.end_nodes)))
-        return self.base_cost(p) + min(list(map(lambda x: self.heuristic_cost(p.coord, x), self.end_nodes)))
-
-    def is_valid_point(self, p_coord: tuple):
-        if self.coord_valid(p_coord, self.space_coords[0], self.space_coords[1]) and self.free_grid[p_coord]:
-            return True
-        else:
-            return False
+    def total_cost(self, p, end):
+        return self.base_cost(p) + self.heuristic_cost(p.coord, end)
 
     def is_in_open_set(self, p_coord: tuple):
-        if self.open_set[p_coord] > 0:
+        if p_coord in self.open_set and self.open_set[p_coord] == 0:
             return True
         return False
 
@@ -147,41 +173,41 @@ class AStar:
 
     def is_feasible_bend_point(self, p):
         p_n_cp = p.n_cp
-        k = -1  # the point number between two bend points
+        k = 0  # the point number between two bend points
         while p.parent and p.parent.n_cp >= p_n_cp - 1:
             p = p.parent
             k += 1
         # print(list(abs(x - y) for x, y in zip(p_coord, end)))
         return k >= self.min_dis_bend
 
-    def is_enough_space(self, p):
-        p_coord = p.coord
-        prev_p_coord = p.parent.coord
-        m = 0
-        for k in range(self.dim):
-            if prev_p_coord[k] != p_coord[k]:
-                m = k
-                break
-        shift = [self.diameter] * self.dim
-        shift[m] = 0
+    def is_enough_space(self, p_coord, direction, radius, delta):
+        shift = [math.ceil(radius + delta)] * self.dim
+        if direction in ['+x', '-x']:
+            shift[0] = 0
+        elif direction in ['+y', '-y']:
+            shift[1] = 0
+        else:
+            shift[2] = 0
         p1 = tuple_operations(p_coord, tuple(shift), '-')
         p2 = tuple_operations(p_coord, tuple(shift), '+')
         for item in list(product(*(range(s, e+1) for s, e in zip(p1, p2)))):
-            if not self.is_valid_point(item):
+            if item not in self.open_set:
                 return False
-
         return True
 
-    def process_point(self, curr_p):
+    def process_point(self, curr_p, end_info):
         curr_p_coord = curr_p.coord
-        if curr_p.n_cp == curr_p.parent.n_cp + 1 and not self.is_feasible_bend_point(curr_p):
-            return None  # district the minimum distance between two bend point
+        if curr_p.n_cp == curr_p.parent.n_cp + 1:
+            if self.is_feasible_bend_point(curr_p):  # or (self.cmp(curr_p.coord, end_info[0]) and curr_p.direction == end_info[1]) or curr_p.depth == 2
+                pass
+            else:
+                return None  # district the minimum distance between two bend point
 
-        if not self.is_enough_space(curr_p):
-            return None  # there is enough space for pipes with diameter > grid size
+        p_cost = self.total_cost(curr_p, end_info[0])
+        if not self.is_enough_space(curr_p.coord, curr_p.direction, self.radius, self.delta):
+            p_cost = p_cost + 2.
 
-        p_cost = self.total_cost(curr_p)
-        if not self.is_in_open_set(curr_p_coord):
+        if self.is_in_open_set(curr_p_coord):
             self.open_set[curr_p_coord] = p_cost
             self.pq.put((p_cost, curr_p))
         elif p_cost < self.open_set[curr_p_coord]:  # update minimum cost and node
@@ -192,53 +218,93 @@ class AStar:
             pass
 
     def build_path(self, p):
+        bend_path = []
         path = []
-        bend_point = [p.coord]
+        bend_path.insert(0, p.coord_info)  # Insert first
         while True:
-            path.insert(0, p.coord)  # Insert first
-            if p.parent is None:  # p is start point
-                bend_point.insert(0, p.coord)
+            if self.cmp(p.coord, self.start.coord):
                 break
-            if p.n_cp == p.parent.n_cp + 1:
-                bend_point.insert(0, p.parent.coord)
-            p = p.parent
-        return path, bend_point
-        
-    def run(self, start_nodes, end_nodes, diameter=3):
-        start_time = time.time()
-        if isinstance(start_nodes, tuple):
-            start_nodes = [start_nodes]
-        if isinstance(end_nodes, tuple):
-            end_nodes = [end_nodes]
+            else:
+                path.insert(0, p.coord_info)
+                if p.n_cp == p.parent.n_cp + 1:
+                    bend_path.insert(0, p.parent.coord_info)
+                p = p.parent
+        bend_path.insert(0, self.start.coord_info)
+        if self.cmp(bend_path[0][0], bend_path[1][0]):
+            bend_path.pop(0)
+        path.insert(0, self.start.coord_info)
+        return bend_path, path
 
-        for k in range(len(start_nodes)):
-            start_node = start_nodes[k]
-            start_p = Node(start_node, energy=self.energy[start_node])
-            self.pq.put((0, start_p))
+    @time_it
+    def run(self, start_info, end_info, radius, delta):
+        # for example start_info: ((5, 7, 0), "+x"); end_info: ((0, 99, 77), "+y");
 
-        self.end_nodes = end_nodes
-        self.diameter = diameter
+        self.radius = radius
+        self.delta = delta
+        self.start = Node(start_info, edge_cost=0.)
+        self.pq.put((0, self.start))
 
         detailed_info = []
         while not self.pq.empty():
             # find the node with minimum cost
             curr_p = self.pq.get()[1]
             # print(f'Process Point: {curr_p.coord}')
-            if curr_p.coord in end_nodes:  # exit if finding the end point
+            if self.cmp(curr_p.coord, end_info[0]):  # exit if finding the end point
                 return self.build_path(curr_p), detailed_info
             self.close_set[curr_p.coord] = 1
             self.open_set[curr_p.coord] = 0
 
             pre_p = curr_p
             for direction in self.directions:
-                curr_p_coord = tuple_operations(pre_p.coord, direction, '+')
-                if not self.is_valid_point(curr_p_coord):
+                curr_p_coord = tuple_operations(pre_p.coord, direction[0], '+')
+                if curr_p_coord not in self.open_set:
                     continue  # Do nothing for invalid point
                 if self.is_in_close_set(curr_p_coord):
                     continue  # Do nothing for visited point
-                curr_p = Node(curr_p_coord, parent=pre_p, energy=self.energy[curr_p_coord])
-                self.process_point(curr_p)
+                edge_cost = self.edge_cost[(curr_p_coord, direction[1])]
+                curr_p = Node((curr_p_coord, direction[1]), parent=pre_p, edge_cost=edge_cost)
+                self.process_point(curr_p, end_info=end_info)
             if self.gif:
                 detailed_info.append((self.open_set.copy(), pre_p.coord))
-        end_time = time.time()
-        print(f"Simulation time {end_time - start_time :.3f}")
+        return (None, None), detailed_info
+
+
+if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+    import matplotlib.animation as anime
+    from plotting import cuboid
+    space_coords = ((0, 0), (10, 10))  # coords
+    # obstacle_coord = [[(3, 3), (6, 6)]]
+    obstacle_coord = []
+    pipes = (((0, 4), "+x"), ((10, 6), "+x"), 1, 0)
+    n_pipe = 1
+    model = AStar(space_coords, obstacle_coord, w_path=1., w_bend=2., w_energy=1., min_dis_bend=2, gif=True)
+    (bend_path, path), info = model.run(pipes[0], pipes[1], pipes[2], pipes[3])
+    print(bend_path)
+    print("-----\n")
+    print(path)
+    fig_gif = plt.figure(figsize=(5, 5))
+    axes = fig_gif.gca()
+    metadata = dict(title="Movie", artist="sourabh")
+    writer = anime.PillowWriter(fps=1, metadata=metadata)
+    with writer.saving(fig_gif, "Astar.gif", 100):
+        for i in range(len(info)):
+            point = info[i][-1]
+            open_map = info[i][0]
+            cuboid.structure_cuboid(space_coords[0], space_coords[1], ax=axes)
+            for k in range(len(obstacle_coord)):
+                cuboid.shadow_cuboid(obstacle_coord[k][0], obstacle_coord[k][1], ax=axes)
+            axes.scatter(*point, marker="o", c="red", alpha=1., s=50)
+            nonzero_coords = [value[0] for value in open_map.items() if value[1] > 0]
+            for x_ind, y_ind in nonzero_coords:
+                axes.text(x_ind-0.2, y_ind + 0.1, f"{open_map[x_ind, y_ind]:.1f}", size=10, color="black")
+            axes.set_xlim([space_coords[0][0], space_coords[1][0]])
+            axes.set_ylim([space_coords[0][1], space_coords[1][1]])
+            axes.set_xticks(range(space_coords[0][0], space_coords[1][0], 1))
+            axes.set_yticks(range(space_coords[0][1], space_coords[1][1], 1))
+            axes.grid(True)
+            axes.set_xlabel("x", fontsize=30)
+            axes.set_ylabel("y", fontsize=30)
+            writer.grab_frame()
+            axes.cla()
+
