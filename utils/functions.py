@@ -4,22 +4,22 @@
 # @Author  : Leijun Ye
 import numpy as np
 
+
 def tuple_operations(t1, t2, operator):
     """
     This function implements the addition, subtraction, multiplication, and division between Tuples
     and between Tuple and number.
 
-    Args:
-    t1: tuple type, the Tuple to be operated, the length needs to be the same as t2.
-    t2: tuple or int/float type, the Tuple or a constant to be operated.
-    operator: str type, the operator, including +, -, *, /.
+    :param t1: tuple type, the Tuple to be operated, the length needs to be the same as t2.
+    :param t2: tuple or int/float type, the Tuple or a constant to be operated.
+    :param operator: str type, the operator, including +, -, *, /.
 
-    Returns:
-    result: tuple type, the result of the operation. When operator is +-,
-            the length of the result is the same as that of t1 and t2;
-            when operator is */ and t2 is int/float,
-            the length of the result is the same as that of t1.
+    :return: tuple type, the result of the operation. When operator is +-,
+             the length of the result is the same as that of t1 and t2;
+             when operator is */ and t2 is int/float,
+             the length of the result is the same as that of t1.
     """
+
     if isinstance(t2, int) or isinstance(t2, float):
         # When t2 is int or float type, execute number multiplication and division operations
         if operator == '+':
