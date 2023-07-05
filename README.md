@@ -13,11 +13,11 @@ the main reference is this [paper](https://www.sciencedirect.com/science/article
 
 <div style="display: flex; align-items: center;">
   <div style="width: 50%; text-align: center;">
-    <img src="test_case/init_pipes.png" alt="Image 1" style="width: 80%;">
+    <img src="https://github.com/yeyeleijun/PipeWiringOptimization/test_case/init_pipes.png" alt="Image 1" style="width: 80%;">
     <p style="font-size: 16px;">Pipe wiring before optimization</p>
   </div>
   <div style="width: 50%; text-align: center;">
-    <img src="test_case/optimized_pipes.png" alt="Image 2" style="width: 80%;">
+    <img src="https://github.com/yeyeleijun/PipeWiringOptimization/test_case/optimized_pipes.png" alt="Image 2" style="width: 80%;">
     <p style="font-size: 16px;">Pipe wiring after optimization</p>
   </div>
 </div>
@@ -47,7 +47,7 @@ This project relies on the visualization software [mayavi](https://docs.enthough
 Some effective test codes can be found in `test_case/test.py`. The gif blow shows the visualization of A* searching.
 
 <p align="center">
-  <img src="test_case/Astar.gif" alt="Image 1" title="Visualization of A* searching" width="60%">
+  <img src="https://github.com/yeyeleijun/PipeWiringOptimization/test_case/Astar.gif" alt="Image 1" title="Visualization of A* searching" width="60%">
 </p>
 
 ## 🔑Limitation and future direction
